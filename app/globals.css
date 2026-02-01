@@ -50,3 +50,18 @@ body {
 .badge-high { @apply bg-red-100 text-red-800; }
 .badge-medium { @apply bg-amber-100 text-amber-800; }
 .badge-low { @apply bg-slate-100 text-slate-600; }
+
+/* Pre-auth workflow stage entrance */
+@keyframes workflow-fade-slide {
+  from {
+    opacity: 0;
+    transform: translateX(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.workflow-stage-content {
+  animation: workflow-fade-slide 0.3s ease-out;
+}

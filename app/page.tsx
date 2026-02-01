@@ -21,7 +21,6 @@ export default function DashboardPage() {
       <header className="border-b border-slate-200 bg-white px-8 py-6">
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-4">
-            <RxPayLogo className="h-10 w-auto flex-shrink-0" />
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">{currentTpa.name} Copilot</h1>
               <p className="mt-0.5 text-sm text-slate-500">{currentTpa.tagline}</p>
@@ -30,7 +29,6 @@ export default function DashboardPage() {
         </div>
         <div className="mt-6 rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white px-6 py-5 shadow-sm">
           <p className="text-lg leading-relaxed text-slate-700 md:text-xl">
-            <span className="font-semibold tracking-tight text-slate-900">At a glance:</span>{" "}
             {awaitingDocs} pre-auth{awaitingDocs !== 1 ? "s" : ""} awaiting docs, {underReview} under review, {openFraud} open fraud alert{openFraud !== 1 ? "s" : ""}, and {compliantRules}/{complianceRules.length} compliance rules up to date. Use the cards below to drill into each area.
           </p>
         </div>
@@ -173,30 +171,6 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
-          </div>
-        </div>
-
-        {/* How AI fits your workflow */}
-        <div className="mt-8 rounded-xl border border-teal-200 bg-teal-50/50 p-6">
-          <h2 className="font-semibold text-slate-900">How AI fits your workflow</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            RxPay Copilot plugs into your existing TPA process. It does not replace your team — it speeds up
-            pre-auth by flagging missing documents and IRDAI requirements, surfaces duplicate billing and anomalies
-            for review, and keeps compliance checks aligned with IRDAI circulars. You stay in control; AI assists.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4">
-            <span className="inline-flex items-center rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-800">
-              Pre-auth completeness
-            </span>
-            <span className="inline-flex items-center rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-800">
-              Fraud & duplicate detection
-            </span>
-            <span className="inline-flex items-center rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-800">
-              IRDAI compliance checks
-            </span>
-            <span className="inline-flex items-center rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-800">
-              Fits current workflow
-            </span>
           </div>
         </div>
       </div>

@@ -13,8 +13,7 @@ import {
   getSimulatedAnalysisResult,
 } from "@/lib/data";
 import { PreAuthStatusBadge, ComplianceStatusBadge } from "../../components/StatusBadge";
-import { RxPayLogo } from "../../components/RxPayLogo";
-import { AnalysisFlow } from "./AnalysisFlow";
+import { PreAuthWorkflow } from "./PreAuthWorkflow";
 
 export default async function PreAuthDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,11 +27,10 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
   const simulatedResult = getSimulatedAnalysisResult(pa.id);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
       <header className="border-b border-slate-200 bg-white px-8 py-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <RxPayLogo className="h-10 w-auto flex-shrink-0" />
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
             <Link
               href="/pre-auth"
               className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
@@ -67,22 +65,24 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         </div>
       </header>
 
-      <div className="p-8">
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Left: Analysis flow (Start Analysis → checklist step-by-step → summary + actions) */}
-          <div className="lg:col-span-2 space-y-6">
-            <AnalysisFlow
+      <div className="p-8 min-w-0 overflow-x-hidden">
+        <div className="grid gap-8 lg:grid-cols-3 min-w-0">
+          {/* Left: 7-stage pre-auth workflow (Request → Docs → Eligibility → Coding → Necessity → Fraud → Queries & Decision) */}
+          <div className="lg:col-span-2 space-y-6 min-w-0">
+            <PreAuthWorkflow
+              preAuthId={pa.id}
+              claimId={pa.claimId}
+              procedure={pa.procedure}
+              diagnosis={pa.diagnosis}
+              estimatedAmount={pa.estimatedAmount}
               checklist={pa.checklist}
               analysisResult={simulatedResult}
-              estimatedAmount={pa.estimatedAmount}
-              procedure={pa.procedure}
-              claimId={pa.claimId}
               missingCritical={pa.missingCritical}
             />
           </div>
 
           {/* Right: Summary sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="font-semibold text-slate-900">Summary</h2>
               <dl className="mt-4 space-y-3 text-sm">
@@ -147,35 +147,18 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
               </dl>
             </div>
 
-            <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-5">
-              <h3 className="font-semibold text-slate-900">AI Readiness</h3>
-              <div className="mt-3 flex items-center gap-4">
-                <div className="h-4 w-24 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      pa.aiReadinessScore >= 80 ? "bg-emerald-500" : pa.aiReadinessScore >= 50 ? "bg-amber-500" : "bg-red-500"
-                    }`}
-                    style={{ width: `${pa.aiReadinessScore}%` }}
-                  />
-                </div>
-                <span className="text-2xl font-semibold text-slate-900">{pa.aiReadinessScore}%</span>
-              </div>
-              <p className="mt-2 text-sm text-slate-600">
-                {pa.aiReadinessScore >= 80
-                  ? "All mandatory items present. Ready for TPA review."
-                  : pa.aiReadinessScore >= 50
-                    ? "Some items missing. Request from hospital to avoid back-and-forth."
-                    : "Run analysis to check completeness against IRDAI guidelines."}
-              </p>
-            </div>
-
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900">Workflow</h3>
-              <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-slate-600">
-                <li>Run AI checklist (Start analysis above).</li>
-                <li>Review summary; Approve, Deny, or Query hospital.</li>
-                <li>Within 48 hrs of complete docs per IRDAI.</li>
+              <h3 className="font-semibold text-slate-900">7-Stage Workflow</h3>
+              <ol className="mt-3 list-decimal list-inside space-y-1.5 text-xs text-slate-600">
+                <li>Request initiation</li>
+                <li>Documentation completeness</li>
+                <li>Eligibility & coverage</li>
+                <li>Medical coding (ICD-10 / CPT)</li>
+                <li>Medical necessity</li>
+                <li>Fraud & anomaly</li>
+                <li>Queries & decision</li>
               </ol>
+              <p className="mt-2 text-xs text-slate-500">TAT: 1 hr from complete docs (IRDAI).</p>
             </div>
           </div>
         </div>
