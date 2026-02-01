@@ -5,9 +5,11 @@ import type {
   Insurer,
   PolicyHolder,
   PreAuthRequest,
+  PreAuthCheckItem,
   Claim,
   FraudAlert,
   ComplianceRule,
+  TPAAssignee,
 } from "./types";
 
 export const hospitals: Hospital[] = [
@@ -27,6 +29,12 @@ export const insurers: Insurer[] = [
   { id: "I005", name: "Niva Bupa Health Insurance", irdaiRegistration: "IRDAI/HLT/NIVA/2019" },
 ];
 
+export const tpaAssignees: TPAAssignee[] = [
+  { id: "A001", name: "Anita Desai", role: "Senior Claims Analyst", avatar: "AD" },
+  { id: "A002", name: "Rahul Mehta", role: "Claims Analyst", avatar: "RM" },
+  { id: "A003", name: "Kavitha Krishnan", role: "Medical Review Specialist", avatar: "KK" },
+];
+
 export const policyHolders: PolicyHolder[] = [
   { id: "P001", name: "Rajesh Kumar", policyNumber: "STAR/HL/2023/456789", insurerId: "I001", sumInsured: 1000000, relationship: "self" },
   { id: "P002", name: "Priya Sharma", policyNumber: "HDFC/HL/2022/234567", insurerId: "I002", sumInsured: 500000, relationship: "self" },
@@ -39,10 +47,11 @@ export const policyHolders: PolicyHolder[] = [
 export const preAuthRequests: PreAuthRequest[] = [
   {
     id: "PA001",
-    claimId: "CLM001",
+    claimId: "CLM/2025/001/STAR",
     hospitalId: "H001",
     policyHolderId: "P001",
     insurerId: "I001",
+    assigneeId: "A001",
     status: "awaiting_docs",
     estimatedAmount: 285000,
     procedure: "Coronary Angioplasty with Stent",
@@ -66,10 +75,11 @@ export const preAuthRequests: PreAuthRequest[] = [
   },
   {
     id: "PA002",
-    claimId: "CLM002",
+    claimId: "CLM/2025/002/HDFC",
     hospitalId: "H002",
     policyHolderId: "P002",
     insurerId: "I002",
+    assigneeId: "A002",
     status: "under_review",
     estimatedAmount: 175000,
     procedure: "Laparoscopic Cholecystectomy",
@@ -93,10 +103,11 @@ export const preAuthRequests: PreAuthRequest[] = [
   },
   {
     id: "PA003",
-    claimId: "CLM003",
+    claimId: "CLM/2025/003/ICICI",
     hospitalId: "H003",
     policyHolderId: "P003",
     insurerId: "I003",
+    assigneeId: "A003",
     status: "submitted",
     estimatedAmount: 420000,
     procedure: "Total Knee Replacement",
@@ -116,6 +127,34 @@ export const preAuthRequests: PreAuthRequest[] = [
       { id: "c6", label: "Policy copy", status: "complete", value: "Verified" },
       { id: "c7", label: "ID proof", status: "complete", value: "Verified" },
       { id: "c8", label: "Waiting period / pre-existing", status: "pending" },
+    ],
+  },
+  {
+    id: "PA004",
+    claimId: "CLM/2025/004/CARE",
+    hospitalId: "H004",
+    policyHolderId: "P004",
+    insurerId: "I004",
+    assigneeId: "A002",
+    status: "submitted",
+    estimatedAmount: 195000,
+    procedure: "Cataract Surgery (Phaco with IOL)",
+    diagnosis: "Senile Cataract, Bilateral",
+    icdCode: "H25.1",
+    submittedAt: "2025-02-01T10:00:00Z",
+    slaDeadline: "2025-02-03T18:00:00Z",
+    aiReadinessScore: 0,
+    missingCritical: [],
+    complianceStatus: "pending_review",
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
+      { id: "c2", label: "Doctor's recommendation with stamp", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
+      { id: "c4", label: "Consent form with patient signature", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
+      { id: "c5", label: "Pre-operative investigation reports", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
+      { id: "c6", label: "Policy copy / e-card", status: "pending" },
+      { id: "c7", label: "ID proof (Aadhaar/Passport)", status: "pending" },
+      { id: "c8", label: "Waiting period compliance check", irdaiRef: "Policy terms", status: "pending" },
     ],
   },
 ];
@@ -192,6 +231,10 @@ export function getPolicyHolder(id: string): PolicyHolder | undefined {
   return policyHolders.find((p) => p.id === id);
 }
 
+export function getAssignee(id: string): TPAAssignee | undefined {
+  return tpaAssignees.find((a) => a.id === id);
+}
+
 export function getPreAuth(id: string): PreAuthRequest | undefined {
   return preAuthRequests.find((p) => p.id === id);
 }
@@ -206,4 +249,32 @@ export function formatDate(iso: string): string {
 
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/** Display pre-auth key e.g. PA001 → PA/2025/001 */
+export function formatPreAuthKey(id: string): string {
+  const num = id.replace(/\D/g, "") || "0";
+  return `PA/2025/${num.padStart(3, "0")}`;
+}
+
+/** Simulated AI analysis result for demo flow (step-by-step checklist run). Used when checklist is pending. */
+export function getSimulatedAnalysisResult(paId: string): PreAuthCheckItem[] | null {
+  const pa = getPreAuth(paId);
+  if (!pa) return null;
+  const allPending = pa.checklist.every((c) => c.status === "pending");
+  if (!allPending) return null; // already analysed, use existing checklist
+  // PA004 demo: simulate result (mix of complete and missing, like PA001)
+  if (paId === "PA004") {
+    return [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "₹1,95,000" },
+      { id: "c4", label: "Consent form with patient signature", irdaiRef: "IRDAI Circular 12/2016", status: "missing", aiSuggestion: "Request signed consent from hospital. Template available per IRDAI guidelines." },
+      { id: "c5", label: "Pre-operative investigation reports", irdaiRef: "IRDAI Circular 12/2016", status: "missing", aiSuggestion: "Slit-lamp, A-scan required for cataract pre-auth." },
+      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
+      { id: "c7", label: "ID proof (Aadhaar/Passport)", status: "complete", value: "Aadhaar linked" },
+      { id: "c8", label: "Waiting period compliance check", irdaiRef: "Policy terms", status: "complete", value: "Compliant" },
+    ];
+  }
+  return null;
 }

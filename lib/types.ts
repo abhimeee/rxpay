@@ -30,6 +30,13 @@ export interface PolicyHolder {
   relationship: "self" | "spouse" | "child" | "parent" | "other";
 }
 
+export interface TPAAssignee {
+  id: string;
+  name: string;
+  role: string;
+  avatar?: string; // initials for display
+}
+
 export interface PreAuthCheckItem {
   id: string;
   label: string;
@@ -45,6 +52,7 @@ export interface PreAuthRequest {
   hospitalId: string;
   policyHolderId: string;
   insurerId: string;
+  assigneeId?: string; // TPA team member reviewing this claim
   status: PreAuthStatus;
   estimatedAmount: number;
   procedure: string;
