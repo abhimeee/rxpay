@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RxPay TPA Copilot — Demo
 
-## Getting Started
+A demo site for **TPA leadership** showing how AI can assist TPA teams with claims verification, pre-auth completeness, fraud detection, and IRDAI compliance — within their current workflow.
 
-First, run the development server:
+## What’s in the demo
+
+- **Dashboard** — KPIs for pre-auth awaiting docs, under review, open fraud alerts, and compliance. Snapshot of pre-auth queue and fraud alerts with links to detail.
+- **Pre-Auth Queue** — List of pre-auth requests with AI readiness score, status, and compliance. Click a row to open the detail view.
+- **Pre-Auth Detail** — AI completeness checklist per IRDAI (e.g. Form A, doctor recommendation, cost breakdown, consent, investigations). Missing items show AI suggestions. Summary panel with patient, hospital, insurer, SLA, and “next steps in your workflow”.
+- **Fraud Alerts** — AI-detected duplicate billing and anomalies. Each alert shows claim IDs, description, AI confidence, duplicate details (original vs duplicate, amount overlap, matching items). Actions: Under investigation, Resolved, False positive.
+- **Compliance** — IRDAI-aligned rules (e.g. 48 hr pre-auth response, cashless documentation, settlement timelines). Table with rule name, IRDAI ref, description, category, status, last checked.
+
+All data is **realistic dummy data** (Indian hospitals like Apollo, Fortis, Max; insurers like Star Health, HDFC ERGO, ICICI Lombard; policy numbers, ICD codes, IRDAI refs).
+
+## Run the demo
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Use the sidebar to move between Dashboard, Pre-Auth Queue, Fraud Alerts, and Compliance.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Core value props (for leadership)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Pre-auth delays** — AI flags missing docs and IRDAI requirements so hospitals and TPA spend less time on back-and-forth; checklist keeps responses compliant.
+2. **Fraud detection** — Surfaces likely duplicate billing (same patient/procedure/item overlap) for manual review instead of fully manual spotting.
+3. **Compliance** — Checks tied to IRDAI circulars; fits into existing workflow (no replacement of current systems).
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Later you can add more features (e.g. claim adjudication assistance, hospital/insurer coordination views).
