@@ -8,6 +8,59 @@ import { AnalysisFlow } from "./AnalysisFlow";
 
 const STAGE_IDS = WORKFLOW_STAGES.map((s) => s.id);
 
+const providerFraudBreakdowns = [
+  {
+    title: "Billing for procedures not performed (phantom billing)",
+    assessment: "Unlikely",
+    detail: "Docs and timestamps align with procedure claims.",
+  },
+  {
+    title:
+      "Billing for procedures more frequently than clinically justified (e.g., imaging every week instead of monthly)",
+    assessment: "Likely",
+    detail: "Utilization exceeds peer benchmarks for diagnosis.",
+  },
+  {
+    title: "Coding procedures as more expensive than what was actually done",
+    assessment: "Possible",
+    detail: "Codes appear higher than documented complexity.",
+  },
+  {
+    title: "Admitting patients for unnecessary extended stays",
+    assessment: "Unlikely",
+    detail: "Length of stay aligns with clinical severity.",
+  },
+  {
+    title: "Unnecessary tests bundled with all cases",
+    assessment: "Possible",
+    detail: "Routine add-ons appear across cases without indication.",
+  },
+];
+
+const patientFraudBreakdowns = [
+  {
+    title: "Submitting false documentation",
+    assessment: "Unlikely",
+    detail: "Signatures and timestamps match facility records.",
+  },
+  {
+    title: "Claiming treatment at a hospital but actually getting it elsewhere",
+    assessment: "Possible",
+    detail: "Location codes differ from scheduling logs.",
+  },
+  {
+    title: "Misrepresenting pre-existing conditions",
+    assessment: "Likely",
+    detail: "History conflicts with prior claims data.",
+  },
+];
+
+const assessmentStyles: Record<string, string> = {
+  Likely: "border-red-200 bg-red-50/70",
+  Possible: "border-amber-200 bg-amber-50/70",
+  Unlikely: "border-emerald-200 bg-emerald-50/70",
+};
+
 interface PreAuthWorkflowProps {
   preAuthId: string;
   claimId: string;
@@ -188,6 +241,8 @@ export function PreAuthWorkflow({
             {stageId === "medical_necessity" && (workflowData ? (
               <MedicalNecessityContent
                 items={workflowData.medicalNecessity}
+                score={workflowData.medicalNecessityScore}
+                insights={workflowData.medicalNecessityInsights}
                 onToggleFlag={(itemId, label) => toggleFlag("medical_necessity", itemId, label)}
                 isFlagged={(itemId) => isFlagged("medical_necessity", itemId)}
               />
@@ -462,10 +517,14 @@ function CodingContent({
 
 function MedicalNecessityContent({
   items,
+  score,
+  insights,
   onToggleFlag,
   isFlagged,
 }: {
   items: PreAuthWorkflowData["medicalNecessity"];
+  score: PreAuthWorkflowData["medicalNecessityScore"];
+  insights: PreAuthWorkflowData["medicalNecessityInsights"];
   onToggleFlag: (itemId: string, label: string) => void;
   isFlagged: (itemId: string) => boolean;
 }) {
@@ -477,10 +536,74 @@ function MedicalNecessityContent({
     5: "Treating provider",
   };
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-600 mb-4">
-        Hierarchy: Level 1 (highest) to Level 5 (lowest). Higher level overrides lower.
-      </p>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">Diagnosis ↔ procedure check</h3>
+            <p className="text-xs text-slate-500">Quick view of what supports the procedure.</p>
+          </div>
+          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            Necessity score: {score}/100
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          {insights.map((insight) => (
+            <details key={insight.id} className="group rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm text-slate-700">
+                <span className="font-medium text-slate-800">
+                  {insight.diagnosisCode} → {insight.procedureCode}
+                </span>
+                <span className="text-xs text-slate-500">{insight.aiSimilarityPct}% similar</span>
+              </summary>
+              <div className="mt-2 space-y-2 text-xs text-slate-600">
+                <p>
+                  <span className="font-semibold text-slate-700">Diagnosis:</span> {insight.diagnosisDescription}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-700">Procedure:</span> {insight.procedureDescription}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      insight.irdaApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    IRDAI: {insight.irdaApproved ? "Yes" : "Review"}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      insight.policyApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    Policy: {insight.policyApproved ? "Yes" : "Review"}
+                  </span>
+                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                    AI view
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-slate-500">{insight.aiSummary}</p>
+                  <a
+                    href={insight.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {insight.sourceLabel}
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 3h7v7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 14L21 3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 14v7h-7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10V3h7" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </details>
+          ))}
+        </div>
+      </div>
       <ul className="space-y-3">
         {items.map((item) => (
           <li
@@ -522,32 +645,120 @@ function FraudContent({
   onToggleFlag: (itemId: string, label: string) => void;
   isFlagged: (itemId: string) => boolean;
 }) {
+  const fraudScore = flags.length
+    ? Math.max(
+        ...flags.map((flag) =>
+          flag.severity === "high" ? 92 : flag.severity === "medium" ? 74 : flag.severity === "low" ? 48 : 12
+        )
+      )
+    : 0;
+  const hasSuspectedFraud = flags.some((flag) => flag.severity === "high" || flag.severity === "medium");
+
   return (
-    <div className="space-y-3">
-      <ul className="space-y-2">
-        {flags.map((f) => (
-          <li
-            key={f.id}
-            className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg border border-slate-100 bg-slate-50/50"
-          >
+    <div className="space-y-4">
+      {hasSuspectedFraud && (
+        <div className="rounded-xl border-2 border-red-500 bg-red-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <span
-                className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium mr-2 ${
-                  f.severity === "high" ? "bg-red-100 text-red-800" : f.severity === "medium" ? "bg-amber-100 text-amber-800" : f.severity === "low" ? "bg-slate-200 text-slate-700" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {f.severity}
-              </span>
-              <span className="text-xs text-slate-500 capitalize">{f.category}</span>
-              <p className="text-sm text-slate-800 mt-0.5">{f.description}</p>
+              <p className="text-sm font-semibold text-red-800">Critical: suspected fraud detected</p>
+              <p className="text-xs text-red-700 mt-0.5">
+                Escalate to compliance immediately. Do not investigate directly—document and pend.
+              </p>
             </div>
-            <FlagCheckbox
-              checked={isFlagged(f.id)}
-              onChange={() => onToggleFlag(f.id, f.description.slice(0, 40))}
-            />
-          </li>
-        ))}
-      </ul>
+            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+              High priority
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+        <span className="font-semibold text-slate-900">Fraud score</span>
+        <span className="font-mono text-slate-900">{fraudScore}/100</span>
+        <span className="text-slate-500">based on anomaly strength, coding variance, and peer benchmarks</span>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-slate-900">Detected signals</h3>
+        <ul className="mt-2 space-y-2">
+          {flags.map((f) => (
+            <li
+              key={f.id}
+              className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg border border-slate-100 bg-slate-50/50"
+            >
+              <div>
+                <span
+                  className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium mr-2 ${
+                    f.severity === "high"
+                      ? "bg-red-100 text-red-800"
+                      : f.severity === "medium"
+                        ? "bg-amber-100 text-amber-800"
+                        : f.severity === "low"
+                          ? "bg-slate-200 text-slate-700"
+                          : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {f.severity}
+                </span>
+                <span className="text-xs text-slate-500 capitalize">{f.category}</span>
+                <p className="text-sm text-slate-800 mt-0.5">{f.description}</p>
+              </div>
+              <FlagCheckbox
+                checked={isFlagged(f.id)}
+                onChange={() => onToggleFlag(f.id, f.description.slice(0, 40))}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Provider-side fraud breakdown</h3>
+        <div className="space-y-2">
+          {providerFraudBreakdowns.map((item) => (
+            <details
+              key={item.title}
+              className={`group rounded-lg border ${
+                assessmentStyles[item.assessment] ?? "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-slate-800">
+                <span className="min-w-[220px]">{item.title}</span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-sm">
+                  {item.assessment}
+                </span>
+              </summary>
+              <div className="px-3 pb-2 text-xs text-slate-600">
+                {item.detail}
+              </div>
+            </details>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Patient-side fraud breakdown</h3>
+        <div className="space-y-2">
+          {patientFraudBreakdowns.map((item) => (
+            <details
+              key={item.title}
+              className={`group rounded-lg border ${
+                assessmentStyles[item.assessment] ?? "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-slate-800">
+                <span className="min-w-[220px]">{item.title}</span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-sm">
+                  {item.assessment}
+                </span>
+              </summary>
+              <div className="px-3 pb-2 text-xs text-slate-600">
+                {item.detail}
+              </div>
+            </details>
+          ))}
+        </div>
+      </div>
+
       <p className="text-xs text-slate-500">
         Flag and escalate to compliance if fraud suspected. Do not investigate—document and pend if needed.
       </p>

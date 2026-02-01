@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { preAuthRequests, formatCurrency, formatPreAuthKey, getHospital, getPolicyHolder, getAssignee } from "@/lib/data";
+import { getWorkflowData } from "@/lib/workflow-data";
 import { PreAuthStatusBadge, ComplianceStatusBadge } from "../components/StatusBadge";
 import { PageHeader } from "../components/PageHeader";
 
@@ -25,6 +26,7 @@ export default function PreAuthQueuePage() {
                 <th className="px-5 py-4">Hospital</th>
                 <th className="px-5 py-4">Procedure</th>
                 <th className="px-5 py-4">Amount</th>
+                <th className="px-5 py-4">Fraud</th>
                 <th className="px-5 py-4">Assignee</th>
                 <th className="px-5 py-4">Status</th>
                 <th className="px-5 py-4">Compliance</th>
@@ -35,6 +37,10 @@ export default function PreAuthQueuePage() {
                 const hospital = getHospital(pa.hospitalId);
                 const holder = getPolicyHolder(pa.policyHolderId);
                 const assignee = pa.assigneeId ? getAssignee(pa.assigneeId) : null;
+                const workflowData = getWorkflowData(pa.id);
+                const hasSuspectedFraud = workflowData?.fraudFlags.some(
+                  (flag) => flag.severity === "high" || flag.severity === "medium"
+                );
                 return (
                   <tr
                     key={pa.id}
@@ -47,7 +53,9 @@ export default function PreAuthQueuePage() {
                         router.push(`/pre-auth/${pa.id}`);
                       }
                     }}
-                    className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
+                    className={`border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer ${
+                      hasSuspectedFraud ? "bg-red-50/60" : ""
+                    }`}
                   >
                     <td className="px-5 py-4">
                       <span className="font-mono text-sm font-medium text-slate-800">{pa.claimId}</span>
@@ -63,6 +71,15 @@ export default function PreAuthQueuePage() {
                       <p className="text-xs text-slate-500">{pa.icdCode}</p>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-900">{formatCurrency(pa.estimatedAmount)}</td>
+                    <td className="px-5 py-4">
+                      {hasSuspectedFraud ? (
+                        <span className="inline-flex items-center rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                          Suspected
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">None</span>
+                      )}
+                    </td>
                     <td className="px-5 py-4">
                       {assignee ? (
                         <div>

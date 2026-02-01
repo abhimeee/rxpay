@@ -152,6 +152,20 @@ export interface MedicalNecessityItem {
   status: "met" | "not_met" | "conditional";
 }
 
+export interface MedicalNecessityInsight {
+  id: string;
+  diagnosisCode: string;
+  diagnosisDescription: string;
+  procedureCode: string;
+  procedureDescription: string;
+  irdaApproved: boolean;
+  policyApproved: boolean;
+  aiSimilarityPct: number;
+  aiSummary: string;
+  sourceUrl: string;
+  sourceLabel: string;
+}
+
 export interface FraudRedFlag {
   id: string;
   category: "provider" | "patient" | "document";
@@ -168,15 +182,27 @@ export interface WorkflowQuery {
   dueDate?: string;
 }
 
+export interface WorkflowTimelineEvent {
+  id: string;
+  title: string;
+  timestamp: string;
+  status: "done" | "current" | "pending" | "info";
+  detail?: string;
+  meta?: { label: string; value: string }[];
+}
+
 export interface PreAuthWorkflowData {
   requestSummary: {
     admissionType: "planned" | "emergency";
     submittedWithinSLA: boolean;
     items: { label: string; value: string; present: boolean }[];
   };
+  timeline: WorkflowTimelineEvent[];
   eligibility: EligibilityItem[];
   coding: { icd10: CodingItem[]; cpt: CodingItem[] };
   medicalNecessity: MedicalNecessityItem[];
+  medicalNecessityScore: number;
+  medicalNecessityInsights: MedicalNecessityInsight[];
   fraudFlags: FraudRedFlag[];
   queries: WorkflowQuery[];
   p2pRequired: boolean;

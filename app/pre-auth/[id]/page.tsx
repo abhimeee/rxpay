@@ -12,7 +12,9 @@ import {
   formatPreAuthKey,
   getSimulatedAnalysisResult,
 } from "@/lib/data";
+import { getWorkflowData } from "@/lib/workflow-data";
 import { PreAuthStatusBadge, ComplianceStatusBadge } from "../../components/StatusBadge";
+import { CaseTimeline } from "../../components/CaseTimeline";
 import { PreAuthWorkflow } from "./PreAuthWorkflow";
 
 export default async function PreAuthDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +27,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
   const holder = getPolicyHolder(pa.policyHolderId);
   const assignee = pa.assigneeId ? getAssignee(pa.assigneeId) : null;
   const simulatedResult = getSimulatedAnalysisResult(pa.id);
+  const workflowData = getWorkflowData(pa.id);
 
   return (
     <div className="min-h-screen bg-slate-50 overflow-x-hidden">
@@ -147,19 +150,20 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
               </dl>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900">7-Stage Workflow</h3>
-              <ol className="mt-3 list-decimal list-inside space-y-1.5 text-xs text-slate-600">
-                <li>Request initiation</li>
-                <li>Documentation completeness</li>
-                <li>Eligibility & coverage</li>
-                <li>Medical coding (ICD-10 / CPT)</li>
-                <li>Medical necessity</li>
-                <li>Fraud & anomaly</li>
-                <li>Queries & decision</li>
-              </ol>
-              <p className="mt-2 text-xs text-slate-500">TAT: 1 hr from complete docs (IRDAI).</p>
-            </div>
+            {workflowData && (
+              workflowData.timeline.length > 0 ? (
+                <CaseTimeline
+                  events={workflowData.timeline}
+                  assigneeName={assignee?.name}
+                  assigneeRole={assignee?.role}
+                />
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm text-sm text-slate-500">
+                  No timeline events available for this case.
+                </div>
+              )
+            )}
+
           </div>
         </div>
       </div>
