@@ -64,9 +64,17 @@ const assessmentStyles: Record<string, string> = {
 interface PreAuthWorkflowProps {
   preAuthId: string;
   claimId: string;
+  preAuthKey?: string;
+  patientName?: string;
+  policyNumber?: string;
+  insurerName?: string;
+  hospitalName?: string;
   procedure: string;
   diagnosis: string;
+  icdCode?: string;
   estimatedAmount: number;
+  sumInsured?: number;
+  submittedAt?: string;
   checklist: PreAuthCheckItem[];
   analysisResult: PreAuthCheckItem[] | null;
   missingCritical: string[];
@@ -75,9 +83,17 @@ interface PreAuthWorkflowProps {
 export function PreAuthWorkflow({
   preAuthId,
   claimId,
+  preAuthKey,
+  patientName,
+  policyNumber,
+  insurerName,
+  hospitalName,
   procedure,
   diagnosis,
+  icdCode,
   estimatedAmount,
+  sumInsured,
+  submittedAt,
   checklist,
   analysisResult,
   missingCritical,
@@ -208,6 +224,15 @@ export function PreAuthWorkflow({
                   procedure={procedure}
                   claimId={claimId}
                   missingCritical={missingCritical}
+                  preAuthKey={preAuthKey}
+                  patientName={patientName}
+                  policyNumber={policyNumber}
+                  insurerName={insurerName}
+                  hospitalName={hospitalName}
+                  diagnosis={diagnosis}
+                  icdCode={icdCode}
+                  sumInsured={sumInsured}
+                  submittedAt={submittedAt}
                 />
                 <p className="text-xs text-slate-500">
                   IRDAI: Decision within 1 hour of complete documentation. Missing items require query to hospital.

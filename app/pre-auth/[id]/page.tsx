@@ -75,9 +75,17 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             <PreAuthWorkflow
               preAuthId={pa.id}
               claimId={pa.claimId}
+              preAuthKey={formatPreAuthKey(pa.id)}
+              patientName={holder?.name}
+              policyNumber={holder?.policyNumber}
+              insurerName={insurer?.name}
+              hospitalName={hospital?.name}
               procedure={pa.procedure}
               diagnosis={pa.diagnosis}
+              icdCode={pa.icdCode}
               estimatedAmount={pa.estimatedAmount}
+              sumInsured={holder?.sumInsured}
+              submittedAt={formatDateTime(pa.submittedAt)}
               checklist={pa.checklist}
               analysisResult={simulatedResult}
               missingCritical={pa.missingCritical}

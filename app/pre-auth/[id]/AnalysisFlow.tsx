@@ -16,23 +16,33 @@ const padPdfOffset = (offset: number) => String(offset).padStart(10, "0");
 const escapePdfText = (value: string) =>
   value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 
-const buildDummyPdfDataUri = (title: string, subtitle: string, details: string) => {
-  const lines = [title, subtitle, details, "Generated for demo preview only."].map(escapePdfText);
-  const content = [
-    "BT",
-    "/F1 22 Tf",
-    "72 720 Td",
-    `(${lines[0]}) Tj`,
-    "0 -26 Td",
-    "/F1 14 Tf",
-    `(${lines[1]}) Tj`,
-    "0 -20 Td",
-    `(${lines[2]}) Tj`,
-    "0 -18 Td",
-    "/F1 12 Tf",
-    `(${lines[3]}) Tj`,
-    "ET",
-  ].join("\n");
+const encodeBase64 = (value: string) => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
+  }
+  return btoa(binary);
+};
+
+const buildDummyPdfDataUri = (lines: string[]) => {
+  const safeLines = lines.map((line) => escapePdfText(line || " "));
+  const contentParts: string[] = [];
+  if (safeLines.length > 0) {
+    contentParts.push("BT", "/F1 18 Tf", "72 740 Td", `(${safeLines[0]}) Tj`);
+  } else {
+    contentParts.push("BT", "/F1 18 Tf", "72 740 Td", "(Document) Tj");
+  }
+  if (safeLines.length > 1) {
+    contentParts.push("/F1 12 Tf", "0 -22 Td", `(${safeLines[1]}) Tj`);
+  }
+  contentParts.push("/F1 10 Tf");
+  for (let i = safeLines.length > 1 ? 2 : 1; i < safeLines.length; i += 1) {
+    contentParts.push("0 -14 Td", `(${safeLines[i]}) Tj`);
+  }
+  contentParts.push("ET");
+  const content = contentParts.join("\n");
   const objects = [
     "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
     "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
@@ -59,20 +69,192 @@ const buildDummyPdfDataUri = (title: string, subtitle: string, details: string) 
     "%%EOF",
   ].join("\n");
   const pdf = `%PDF-1.4\n${objects.join("")}${xref}`;
-  return `data:application/pdf;base64,${btoa(pdf)}`;
+  return `data:application/pdf;base64,${encodeBase64(pdf)}`;
 };
 
-const DocumentDropdown = ({ item }: { item: PreAuthCheckItem }) => {
+type DocumentContext = {
+  preAuthKey?: string;
+  claimId?: string;
+  patientName?: string;
+  policyNumber?: string;
+  insurerName?: string;
+  hospitalName?: string;
+  procedure?: string;
+  diagnosis?: string;
+  icdCode?: string;
+  estimatedAmount?: number;
+  sumInsured?: number;
+  submittedAt?: string;
+};
+
+const buildCostBreakdown = (amount?: number) => {
+  if (!amount) {
+    return ["Total estimate not provided.", "Breakup to follow per hospital rate card."];
+  }
+  const parts = [
+    { label: "Room and nursing (3 days)", pct: 0.18 },
+    { label: "Surgeon and assistant fees", pct: 0.22 },
+    { label: "Anesthesia and consumables", pct: 0.08 },
+    { label: "OT and equipment charges", pct: 0.14 },
+    { label: "Implant / device", pct: 0.28 },
+    { label: "Pharmacy and disposables", pct: 0.06 },
+  ];
+  const computed = parts.map((part) => ({
+    label: part.label,
+    value: Math.round(amount * part.pct),
+  }));
+  const totalSoFar = computed.reduce((sum, item) => sum + item.value, 0);
+  const remainder = Math.max(amount - totalSoFar, 0);
+  const withRemainder = [
+    ...computed,
+    { label: "Diagnostics and labs", value: remainder || Math.round(amount * 0.04) },
+  ];
+  return withRemainder.map((item) => `${item.label}: ${formatCurrency(item.value)}`);
+};
+
+const buildDocumentDetails = (label: string, context: DocumentContext) => {
+  const lowerLabel = label.toLowerCase();
+  if (lowerLabel.includes("pre-auth form") || lowerLabel.includes("form a")) {
+    return [
+      "Form ID: PA-FORM-A/2025/001",
+      "Requested by: Hospital TPA desk",
+      `Procedure requested: ${context.procedure ?? "As per clinical notes"}`,
+      `Provisional diagnosis: ${context.diagnosis ?? "As per treating physician"}`,
+      "Room category: Semi-private",
+      "Expected length of stay: 3 days",
+      "Treating doctor: Dr. A. Sharma (Reg. 23145)",
+      "Attachments: clinical notes, investigation summary",
+    ];
+  }
+  if (lowerLabel.includes("doctor") && lowerLabel.includes("recommendation")) {
+    return [
+      "Letterhead: Attending physician recommendation",
+      "Physician: Dr. A. Sharma, Medicine",
+      "Reg No: MCI/CH/43210",
+      `Clinical summary: ${context.diagnosis ?? "Patient condition as per notes"}`,
+      `Recommended procedure: ${context.procedure ?? "As per plan"}`,
+      "Rationale: Standard of care; conservative care ineffective.",
+      "Signed and stamped on 2025-02-01",
+    ];
+  }
+  if (lowerLabel.includes("cost breakdown") || lowerLabel.includes("itemized")) {
+    return [
+      "Rate card category: Network hospital cashless",
+      ...buildCostBreakdown(context.estimatedAmount),
+      `Total estimate: ${context.estimatedAmount ? formatCurrency(context.estimatedAmount) : "Pending"}`,
+      "Taxes/consumables included as per tariff.",
+    ];
+  }
+  if (lowerLabel.includes("consent")) {
+    return [
+      `Patient/attendant: ${context.patientName ?? "On file"}`,
+      "Consent type: Procedure + anesthesia",
+      "Risks explained: bleeding, infection, anesthesia reactions",
+      "Alternatives discussed: medical management, deferment",
+      "Witness: Hospital staff on duty",
+      "Signed consent stored in hospital records.",
+    ];
+  }
+  if (
+    lowerLabel.includes("investigation") ||
+    lowerLabel.includes("x-ray") ||
+    lowerLabel.includes("mri")
+  ) {
+    return [
+      "Attached reports:",
+      "CBC, ESR, CRP",
+      "ECG / ECHO summary",
+      "Imaging: X-ray / USG / MRI as applicable",
+      "Key findings: within acceptable range for procedure",
+      "Sample date: 2025-01-28",
+    ];
+  }
+  if (lowerLabel.includes("policy") || lowerLabel.includes("e-card")) {
+    return [
+      `Insurer: ${context.insurerName ?? "On file"}`,
+      `Policy number: ${context.policyNumber ?? "Pending"}`,
+      `Sum insured: ${context.sumInsured ? formatCurrency(context.sumInsured) : "As per policy"}`,
+      "TPA: BioPass TPA Services",
+      "Network: Cashless enabled at hospital",
+      "Validity: 01-Apr-2024 to 31-Mar-2025",
+    ];
+  }
+  if (lowerLabel.includes("id proof")) {
+    return [
+      "ID type: Aadhaar / Passport / DL",
+      "Masked ID: XXXX-XXXX-4521",
+      "Issued by: UIDAI",
+      "Verification: eKYC matched with policy holder",
+      "Date verified: 2025-01-28",
+    ];
+  }
+  if (lowerLabel.includes("waiting period")) {
+    return [
+      "Policy inception: 2023-04-01",
+      "Waiting period: 24 months for pre-existing",
+      "Coverage effective: 2025-04-01",
+      "No waiting period breach detected",
+    ];
+  }
+  return [
+    "Document reviewed by TPA desk.",
+    "Metadata and signatures verified.",
+    "Uploaded via hospital cashless portal.",
+    "Notes: Refer to attached clinical summary.",
+  ];
+};
+
+const buildDocumentLines = (item: PreAuthCheckItem, context: DocumentContext) => {
+  const reference = item.irdaiRef ?? "IRDAI documentation checklist";
+  const statusLabel =
+    item.status === "complete"
+      ? "Complete"
+      : item.status === "missing"
+        ? "Missing"
+        : item.status === "invalid"
+          ? "Invalid"
+          : item.status === "partial"
+            ? "Partial"
+            : "Pending";
+  const diagnosisLine = context.diagnosis
+    ? `${context.diagnosis}${context.icdCode ? ` (ICD ${context.icdCode})` : ""}`
+    : "N/A";
+  const caseDetails = [
+    `Claim ID: ${context.claimId ?? "N/A"}`,
+    `Pre-Auth: ${context.preAuthKey ?? "N/A"}`,
+    `Patient: ${context.patientName ?? "N/A"}`,
+    `Policy: ${context.policyNumber ?? "N/A"}`,
+    `Hospital: ${context.hospitalName ?? "N/A"}`,
+    `Procedure: ${context.procedure ?? "N/A"}`,
+    `Diagnosis: ${diagnosisLine}`,
+    `Estimated amount: ${context.estimatedAmount ? formatCurrency(context.estimatedAmount) : "N/A"}`,
+  ];
+  if (context.submittedAt) {
+    caseDetails.push(`Submitted: ${context.submittedAt}`);
+  }
+  return [
+    item.label,
+    `Status: ${statusLabel}`,
+    `Reference: ${reference}`,
+    `Provided value: ${item.value ?? "Pending"}`,
+    "",
+    "Case Details",
+    ...caseDetails,
+    "",
+    "Document Details",
+    ...buildDocumentDetails(item.label, context),
+    "",
+    "Generated for demo preview only.",
+  ];
+};
+
+const DocumentDropdown = ({ item, context }: { item: PreAuthCheckItem; context: DocumentContext }) => {
   const isMissing = MISSING_STATUSES.has(item.status);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const reference = item.irdaiRef ?? "IRDAI documentation checklist";
   const pdfUri = useMemo(
-    () =>
-      buildDummyPdfDataUri(
-        item.label,
-        `Status: ${item.status.toUpperCase()}`,
-        `Reference: ${reference}`
-      ),
-    [item.label, item.status, reference]
+    () => buildDummyPdfDataUri(buildDocumentLines(item, context)),
+    [item, context]
   );
 
   return (
@@ -90,6 +272,19 @@ const DocumentDropdown = ({ item }: { item: PreAuthCheckItem }) => {
         {item.aiSuggestion && isMissing && (
           <p className="text-xs text-slate-600 mb-2">{item.aiSuggestion}</p>
         )}
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-slate-500">Preview (PDF)</p>
+          <button
+            type="button"
+            onClick={() => setIsFullScreen(true)}
+            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3" />
+            </svg>
+            Enlarge
+          </button>
+        </div>
         <div className="rounded-md border border-slate-200 overflow-hidden bg-white">
           <iframe
             title={`${item.label} preview`}
@@ -97,6 +292,36 @@ const DocumentDropdown = ({ item }: { item: PreAuthCheckItem }) => {
             className="w-full h-56"
           />
         </div>
+        {isFullScreen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-6"
+            onClick={() => setIsFullScreen(false)}
+          >
+            <div
+              className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
+                <p className="text-sm font-medium text-slate-700">{item.label}</p>
+                <button
+                  type="button"
+                  onClick={() => setIsFullScreen(false)}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Close
+                </button>
+              </div>
+              <iframe
+                title={`${item.label} full view`}
+                src={pdfUri}
+                className="h-full w-full"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </details>
   );
@@ -109,6 +334,15 @@ interface AnalysisFlowProps {
   procedure: string;
   claimId: string;
   missingCritical?: string[];
+  preAuthKey?: string;
+  patientName?: string;
+  policyNumber?: string;
+  insurerName?: string;
+  hospitalName?: string;
+  diagnosis?: string;
+  icdCode?: string;
+  sumInsured?: number;
+  submittedAt?: string;
 }
 
 export function AnalysisFlow({
@@ -118,6 +352,15 @@ export function AnalysisFlow({
   procedure,
   claimId,
   missingCritical = [],
+  preAuthKey,
+  patientName,
+  policyNumber,
+  insurerName,
+  hospitalName,
+  diagnosis,
+  icdCode,
+  sumInsured,
+  submittedAt,
 }: AnalysisFlowProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [step, setStep] = useState(0);
@@ -132,6 +375,36 @@ export function AnalysisFlow({
   const completeCount = items.filter((c) => c.status === "complete").length;
   const missingCount = items.filter((c) => c.status === "missing" || c.status === "invalid").length;
   const score = totalSteps ? Math.round((completeCount / totalSteps) * 100) : 0;
+  const documentContext = useMemo(
+    () => ({
+      preAuthKey,
+      claimId,
+      patientName,
+      policyNumber,
+      insurerName,
+      hospitalName,
+      procedure,
+      diagnosis,
+      icdCode,
+      estimatedAmount,
+      sumInsured,
+      submittedAt,
+    }),
+    [
+      preAuthKey,
+      claimId,
+      patientName,
+      policyNumber,
+      insurerName,
+      hospitalName,
+      procedure,
+      diagnosis,
+      icdCode,
+      estimatedAmount,
+      sumInsured,
+      submittedAt,
+    ]
+  );
   const derivedMissingCritical =
     missingCritical.length > 0
       ? missingCritical
@@ -266,7 +539,7 @@ export function AnalysisFlow({
                           : "Pending"}
                   </span>
                 </div>
-                <DocumentDropdown item={item} />
+                <DocumentDropdown item={item} context={documentContext} />
               </div>
             ))}
           </div>
@@ -335,7 +608,7 @@ export function AnalysisFlow({
               {item.aiSuggestion && (item.status === "missing" || item.status === "invalid") && (
                 <p className="mt-1 text-sm text-teal-700 bg-teal-50 rounded-lg px-2 py-1">{item.aiSuggestion}</p>
               )}
-              <DocumentDropdown item={item} />
+              <DocumentDropdown item={item} context={documentContext} />
             </div>
             <span
               className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -393,7 +666,7 @@ export function AnalysisFlow({
               {isChecking && (
                 <p className="mt-1 text-sm text-slate-500 italic">Checking against IRDAI guidelines…</p>
               )}
-              <DocumentDropdown item={currentItem} />
+              <DocumentDropdown item={currentItem} context={documentContext} />
             </div>
             {isRevealed && (
               <span
