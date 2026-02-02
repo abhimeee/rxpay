@@ -304,7 +304,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     fraudFlags: [
       { id: "f1", category: "document", severity: "medium", description: "Cost breakdown incomplete; implant cost not itemized (IRDAI requirement)." },
-      { id: "f2", category: "provider", severity: "none", description: "Network hospital." },
+      { id: "f2", category: "provider", severity: "medium", description: "Implant pricing 2.3x peer median; vendor repeats across unrelated cases." },
     ],
     queries: [
       { id: "q1", question: "Please provide (1) Itemized implant cost breakup (2) Doctor recommendation with hospital stamp (3) Pre-operative X-ray/MRI showing Kellgren-Lawrence stage.", status: "open", dueDate: "2025-02-06" },
@@ -838,7 +838,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     fraudFlags: [
       { id: "f1", category: "document", severity: "high", description: "Core eligibility documentation missing." },
-      { id: "f2", category: "patient", severity: "low", description: "Prior bariatric request 2 years ago; no compliance proof." },
+      { id: "f2", category: "patient", severity: "medium", description: "Prior bariatric requests show conflicting BMI history and reused records." },
     ],
     queries: [],
     p2pRequired: false,

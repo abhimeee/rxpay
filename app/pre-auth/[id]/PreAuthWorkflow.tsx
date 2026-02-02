@@ -1,59 +1,172 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { PreAuthCheckItem, WorkflowStageId, WorkflowFlaggedItem, PreAuthWorkflowData } from "@/lib/types";
+import type { PreAuthCheckItem, WorkflowStageId, WorkflowFlaggedItem, PreAuthWorkflowData, FraudRedFlag } from "@/lib/types";
 import { formatCurrency } from "@/lib/data";
 import { WORKFLOW_STAGES, getWorkflowData } from "@/lib/workflow-data";
 import { AnalysisFlow } from "./AnalysisFlow";
 
 const STAGE_IDS = WORKFLOW_STAGES.map((s) => s.id);
 
-const providerFraudBreakdowns = [
-  {
-    title: "Billing for procedures not performed",
-    assessment: "Unlikely",
-    detail: "Docs and timestamps align with procedure claims.",
-  },
-  {
-    title:
-      "Billing for procedures more frequently than clinically justified",
-    assessment: "Likely",
-    detail: "Utilization exceeds peer benchmarks for diagnosis.",
-  },
-  {
-    title: "Coding procedures as more expensive than what was actually done",
-    assessment: "Possible",
-    detail: "Codes appear higher than documented complexity.",
-  },
-  {
-    title: "Admitting patients for unnecessary extended stays",
-    assessment: "Unlikely",
-    detail: "Length of stay aligns with clinical severity.",
-  },
-  {
-    title: "Unnecessary tests bundled with all cases",
-    assessment: "Possible",
-    detail: "Routine add-ons appear across cases without indication.",
-  },
-];
+type FraudBreakdownItem = {
+  title: string;
+  assessment: "Likely" | "Possible" | "Unlikely";
+  detail: string;
+};
 
-const patientFraudBreakdowns = [
-  {
-    title: "Submitting false documentation",
-    assessment: "Unlikely",
-    detail: "Signatures and timestamps match facility records.",
-  },
-  {
-    title: "Claiming treatment at a hospital but actually getting it elsewhere",
-    assessment: "Possible",
-    detail: "Location codes differ from scheduling logs.",
-  },
-  {
-    title: "Misrepresenting pre-existing conditions",
-    assessment: "Likely",
-    detail: "History conflicts with prior claims data.",
-  },
-];
+const severityRank: Record<FraudRedFlag["severity"], number> = {
+  none: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+const getMaxSeverity = (flags: FraudRedFlag[], category?: FraudRedFlag["category"]) => {
+  const filtered = category ? flags.filter((flag) => flag.category === category) : flags;
+  return filtered.reduce((max, flag) => Math.max(max, severityRank[flag.severity]), 0);
+};
+
+const providerBreakdownsByTier: Record<"low" | "medium" | "high", FraudBreakdownItem[]> = {
+  low: [
+    {
+      title: "Billing for procedures not performed",
+      assessment: "Unlikely",
+      detail: "Docs and timestamps align with procedure claims.",
+    },
+    {
+      title: "Billing for procedures more frequently than clinically justified",
+      assessment: "Possible",
+      detail: "Utilization is slightly above peer benchmarks for diagnosis.",
+    },
+    {
+      title: "Coding procedures as more expensive than what was actually done",
+      assessment: "Possible",
+      detail: "Codes appear higher than documented complexity in a few items.",
+    },
+    {
+      title: "Admitting patients for unnecessary extended stays",
+      assessment: "Unlikely",
+      detail: "Length of stay aligns with clinical severity.",
+    },
+    {
+      title: "Unnecessary tests bundled with all cases",
+      assessment: "Possible",
+      detail: "Routine add-ons appear across cases without clear indication.",
+    },
+  ],
+  medium: [
+    {
+      title: "Upcoding or inflated procedure complexity",
+      assessment: "Likely",
+      detail: "Coding intensity is above peers; narratives do not justify upgrades.",
+    },
+    {
+      title: "Bundling non-essential tests into standard packages",
+      assessment: "Likely",
+      detail: "Repeat add-on tests appear across multiple cases without indication.",
+    },
+    {
+      title: "Billing for procedures more frequently than clinically justified",
+      assessment: "Possible",
+      detail: "Case frequency outpaces expected rates for this diagnosis.",
+    },
+    {
+      title: "Extended stays without documentation of complications",
+      assessment: "Possible",
+      detail: "Length-of-stay patterns exceed norms for similar admissions.",
+    },
+  ],
+  high: [
+    {
+      title: "Phantom or non-rendered services",
+      assessment: "Likely",
+      detail: "Services billed without matching operative or nursing records.",
+    },
+    {
+      title: "Systematic upcoding to higher reimbursement bands",
+      assessment: "Likely",
+      detail: "Procedure codes consistently exceed documented complexity levels.",
+    },
+    {
+      title: "Repeat admissions and duplicate billing patterns",
+      assessment: "Possible",
+      detail: "Similar procedures billed across overlapping dates or facilities.",
+    },
+    {
+      title: "Unnecessary tests bundled with all cases",
+      assessment: "Likely",
+      detail: "Routine tests billed regardless of clinical indication.",
+    },
+  ],
+};
+
+const patientBreakdownsByTier: Record<"low" | "medium" | "high", FraudBreakdownItem[]> = {
+  low: [
+    {
+      title: "Submitting false documentation",
+      assessment: "Unlikely",
+      detail: "Signatures and timestamps match facility records.",
+    },
+    {
+      title: "Claiming treatment at a hospital but actually getting it elsewhere",
+      assessment: "Possible",
+      detail: "Location codes differ from scheduling logs.",
+    },
+    {
+      title: "Misrepresenting pre-existing conditions",
+      assessment: "Possible",
+      detail: "Minor inconsistencies noted in historical records.",
+    },
+  ],
+  medium: [
+    {
+      title: "Misrepresenting pre-existing conditions",
+      assessment: "Likely",
+      detail: "History conflicts with prior claims and chronic medication records.",
+    },
+    {
+      title: "Using another member's policy or identity",
+      assessment: "Possible",
+      detail: "ID metadata and beneficiary details do not align cleanly.",
+    },
+    {
+      title: "Claiming treatment at a hospital but receiving it elsewhere",
+      assessment: "Possible",
+      detail: "Facility codes differ from scheduling logs and travel metadata.",
+    },
+  ],
+  high: [
+    {
+      title: "Policy misuse or identity mismatch",
+      assessment: "Likely",
+      detail: "Identity attributes conflict with enrollment and prior claim data.",
+    },
+    {
+      title: "Staged or exaggerated clinical presentation",
+      assessment: "Likely",
+      detail: "Clinical notes diverge from prior records and baseline history.",
+    },
+    {
+      title: "Duplicate claims across facilities or time windows",
+      assessment: "Possible",
+      detail: "Overlapping treatment windows and repeated submissions detected.",
+    },
+  ],
+};
+
+const getFraudBreakdowns = (flags: FraudRedFlag[]) => {
+  const providerSeverity = getMaxSeverity(flags, "provider");
+  const patientSeverity = getMaxSeverity(flags, "patient");
+  const documentSeverity = getMaxSeverity(flags, "document");
+
+  const providerTier = providerSeverity >= 3 ? "high" : providerSeverity >= 2 ? "medium" : documentSeverity >= 2 ? "medium" : "low";
+  const patientTier = patientSeverity >= 3 ? "high" : patientSeverity >= 2 ? "medium" : patientSeverity >= 1 ? "medium" : "low";
+
+  return {
+    providerBreakdowns: providerBreakdownsByTier[providerTier],
+    patientBreakdowns: patientBreakdownsByTier[patientTier],
+  };
+};
 
 const assessmentStyles: Record<string, string> = {
   Likely: "border-red-200 bg-red-50/70",
@@ -678,6 +791,7 @@ function FraudContent({
       )
     : 0;
   const hasSuspectedFraud = flags.some((flag) => flag.severity === "high" || flag.severity === "medium");
+  const { providerBreakdowns, patientBreakdowns } = getFraudBreakdowns(flags);
 
   return (
     <div className="space-y-4">
@@ -740,7 +854,7 @@ function FraudContent({
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Provider-side fraud breakdown</h3>
         <div className="space-y-2">
-          {providerFraudBreakdowns.map((item) => (
+          {providerBreakdowns.map((item) => (
             <details
               key={item.title}
               className={`group rounded-lg border ${
@@ -763,7 +877,7 @@ function FraudContent({
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Patient-side fraud breakdown</h3>
         <div className="space-y-2">
-          {patientFraudBreakdowns.map((item) => (
+          {patientBreakdowns.map((item) => (
             <details
               key={item.title}
               className={`group rounded-lg border ${
