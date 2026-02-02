@@ -12,7 +12,7 @@ const preAuthStatus: StatusMap = {
 const complianceStatus: StatusMap = {
   compliant: { label: "Compliant", className: "bg-emerald-100 text-emerald-800 border border-emerald-200" },
   partial: { label: "Partial", className: "bg-amber-100 text-amber-800 border border-amber-200" },
-  non_compliant: { label: "Non-compliant", className: "bg-red-100 text-red-800 border border-red-200" },
+  non_compliant: { label: "Fraud Suspected", className: "bg-red-100 text-red-800 border border-red-200" },
   pending_review: { label: "Pending review", className: "bg-slate-100 text-slate-700 border border-slate-200" },
 };
 
