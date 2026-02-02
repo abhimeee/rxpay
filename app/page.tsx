@@ -1,149 +1,308 @@
 import Link from "next/link";
-import { preAuthRequests, complianceRules } from "@/lib/data";
-import { getWorkflowData } from "@/lib/workflow-data";
+import {
+  preAuthRequests,
+  complianceRules,
+  fraudAlerts,
+  formatCurrency,
+  getHospital,
+  getPolicyHolder,
+  calculateSLACompliance,
+  calculateTotalExposure,
+  calculateApprovalRate,
+  calculateAverageProcessingTime,
+  getOverdueRequests,
+  getHighValueRequests,
+  calculateAverageAIReadiness,
+  calculateDocumentCompleteness,
+  getHospitalStats,
+  getDailyThroughput,
+  getOpenFraudAlerts,
+  formatFraudType,
+} from "@/lib/data";
 import { PageHeader } from "./components/PageHeader";
 
 export default function DashboardPage() {
-  const awaitingDocs = preAuthRequests.filter((p) => p.status === "awaiting_docs" || p.status === "submitted").length;
-  const underReview = preAuthRequests.filter((p) => p.status === "under_review").length;
-  const suspectedFraud = preAuthRequests.filter((p) => {
-    const workflowData = getWorkflowData(p.id);
-    return workflowData?.fraudFlags.some((flag) => flag.severity === "high" || flag.severity === "medium");
-  }).length;
-  const compliantRules = complianceRules.filter((r) => r.status === "compliant").length;
-  const totalRequests = preAuthRequests.length;
-  const autoTriage = preAuthRequests.filter((p) => p.aiReadinessScore >= 85).length;
-  const avgReadiness = Math.round(
-    preAuthRequests.reduce((sum, p) => sum + p.aiReadinessScore, 0) / Math.max(totalRequests, 1),
+  // Calculate all metrics
+  const slaCompliance = calculateSLACompliance();
+  const exposure = calculateTotalExposure();
+  const approvalRate = calculateApprovalRate();
+  const avgProcessingTime = calculateAverageProcessingTime();
+  const overdueRequests = getOverdueRequests();
+  const highValueRequests = getHighValueRequests();
+  const avgAIReadiness = calculateAverageAIReadiness();
+  const docCompleteness = calculateDocumentCompleteness();
+  const hospitalStats = getHospitalStats();
+  const throughput = getDailyThroughput();
+  const fraudData = getOpenFraudAlerts();
+
+  // Active requests (not approved/rejected/draft)
+  const activeRequests = preAuthRequests.filter(
+    (p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft"
   );
-  const complianceRate = Math.round((compliantRules / Math.max(complianceRules.length, 1)) * 100);
-  const fraudSignals = preAuthRequests.reduce((sum, p) => {
-    const workflowData = getWorkflowData(p.id);
-    return sum + (workflowData?.fraudFlags.length ?? 0);
-  }, 0);
-  const missingDocs = preAuthRequests.reduce((sum, p) => sum + p.missingCritical.length, 0);
-  const insightsCaptured = fraudSignals + missingDocs;
-  const timeSavedMinutes = Math.round(preAuthRequests.reduce((sum, p) => sum + (p.aiReadinessScore / 100) * 25, 0));
-  const avgTimeSavedMinutes = Math.round(timeSavedMinutes / Math.max(totalRequests, 1));
-  const autoTriageRate = Math.round((autoTriage / Math.max(totalRequests, 1)) * 100);
+  const awaitingDocs = activeRequests.filter((p) => p.status === "awaiting_docs" || p.status === "submitted").length;
+  const underReview = activeRequests.filter((p) => p.status === "under_review").length;
+  const readyForDecision = activeRequests.filter((p) => p.aiReadinessScore >= 85).length;
+
+  // Compliance rules
+  const compliantRules = complianceRules.filter((r) => r.status === "compliant").length;
+  const totalRules = complianceRules.length;
+
+  // Get recent pre-auth requests (top 5)
+  const recentPreAuth = [...preAuthRequests]
+    .filter((p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft")
+    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+    .slice(0, 5);
+
+  // Get recent fraud alerts (top 5)
+  const recentFraudAlerts = [...fraudAlerts]
+    .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
+    .slice(0, 5);
+
+  // Determine system health summary
+  const healthLabel = overdueRequests.length > 0 || slaCompliance.percentage < 75
+    ? "Critical Action Required"
+    : slaCompliance.percentage < 90 || fraudData.highSeverity > 0
+      ? "Attention Needed"
+      : "All Systems Healthy";
+
+  const summaryText = `${activeRequests.length} active pre-auth requests, ${overdueRequests.length} overdue, ${readyForDecision} ready for decision, ${fraudData.highSeverity} high-severity fraud alerts, and ${slaCompliance.percentage}% SLA compliance.`;
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <PageHeader />
+      <PageHeader
+        title="Manager Dashboard"
+        subtitle={summaryText}
+      />
 
-      <div className="p-8">
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-6 text-white shadow-lg">
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-widest text-slate-300">Executive Overview</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white md:text-3xl">
-                RxPay keeps pre-auth moving with measurable efficiency.
-              </h2>
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-200 md:text-base">
-                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm">
-                  {totalRequests} active requests
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200">
-                  {awaitingDocs} waiting on docs
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200">
-                  {underReview} under review
-                </span>
-                <span className="rounded-full border border-amber-200/30 bg-amber-300/10 px-3 py-1 text-sm text-amber-100">
-                  {suspectedFraud} risk flags requiring attention
-                </span>
-                <span className="rounded-full border border-emerald-200/30 bg-emerald-300/10 px-3 py-1 text-sm text-emerald-100">
-                  Compliance coverage {complianceRate}% today
-                </span>
-              </div>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-300">Avg Time Saved Per Claim</p>
-              <p className="metric-rise mt-2 text-3xl font-semibold text-white">47 mins</p>
-              <p className="mt-1 text-xs text-slate-300">Based on Copilot readiness scores</p>
-            </div>
+      <div className="p-8 space-y-8">
+        {/* Simple Health Status Banner */}
+        <div className={`rounded-xl border px-4 py-3 flex items-center justify-between ${healthLabel === "All Systems Healthy"
+            ? "border-emerald-200 bg-emerald-50/50 text-emerald-800"
+            : healthLabel === "Attention Needed"
+              ? "border-amber-200 bg-amber-50/50 text-amber-800"
+              : "border-red-200 bg-red-50/50 text-red-800"
+          }`}>
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+            <span className={`h-2.5 w-2.5 rounded-full ${healthLabel === "All Systems Healthy" ? "bg-emerald-500" : healthLabel === "Attention Needed" ? "bg-amber-500" : "bg-red-500"
+              }`} />
+            {healthLabel}
           </div>
+          <p className="text-xs font-medium opacity-80">
+            Last updated: {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+          </p>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Cases in Motion</p>
-            <p className="metric-rise mt-2 text-2xl font-semibold text-slate-900">{totalRequests}</p>
-            <p className="mt-2 text-xs text-slate-400">{awaitingDocs} awaiting docs · {underReview} under review</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Auto-Triaged by Copilot</p>
-            <p className="metric-rise mt-2 text-2xl font-semibold text-slate-900">{autoTriageRate}%</p>
-            <p className="mt-2 text-xs text-slate-400">{autoTriage} of {totalRequests} cases pre-scored</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Insights Captured</p>
-            <p className="metric-rise mt-2 text-2xl font-semibold text-slate-900">{insightsCaptured}</p>
-            <p className="mt-2 text-xs text-slate-400">{fraudSignals} risk flags · {missingDocs} missing-doc insights</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Compliance Health</p>
-            <p className="metric-rise mt-2 text-2xl font-semibold text-slate-900">{complianceRate}%</p>
-            <p className="mt-2 text-xs text-slate-400">{compliantRules}/{complianceRules.length} rules aligned</p>
-          </div>
-        </div>
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        {/* Primary KPI Grid - Minimal Cards */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Card 1: Active Pre-Auth Queue */}
+          <Link href="/pre-auth" className="rounded-xl border border-slate-200 bg-white p-6 transition-all hover:bg-slate-50 shadow-sm">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Operational Efficiency</h3>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">Live metrics</span>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Active Queue</p>
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
             </div>
-            <div className="mt-6 space-y-5">
-              <div>
-                <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>Auto-triage coverage</span>
-                  <span className="font-semibold text-slate-900">{autoTriageRate}%</span>
+            <p className="mt-4 text-3xl font-bold text-slate-900">{activeRequests.length}</p>
+            <div className="mt-4 flex gap-3 text-xs font-medium">
+              <span className="text-amber-600 px-2 py-0.5 rounded-md bg-amber-50">{awaitingDocs} awaiting docs</span>
+              <span className="text-blue-600 px-2 py-0.5 rounded-md bg-blue-50">{underReview} under review</span>
+            </div>
+          </Link>
+
+          {/* Card 2: SLA Compliance */}
+          <Link href="/pre-auth" className="rounded-xl border border-slate-200 bg-white p-6 transition-all hover:bg-slate-50 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">SLA Compliance</p>
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className={`mt-4 text-3xl font-bold ${slaCompliance.percentage >= 90 ? "text-slate-900" : slaCompliance.percentage >= 75 ? "text-amber-600" : "text-red-600"}`}>
+              {slaCompliance.percentage}%
+            </p>
+            <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full transition-all duration-500 ${slaCompliance.percentage >= 90 ? "bg-teal-600" : slaCompliance.percentage >= 75 ? "bg-amber-500" : "bg-red-500"}`}
+                style={{ width: `${slaCompliance.percentage}%` }}
+              />
+            </div>
+          </Link>
+
+          {/* Card 3: Financial Exposure */}
+          <Link href="/pre-auth" className="rounded-xl border border-slate-200 bg-white p-6 transition-all hover:bg-slate-50 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Financial Exposure</p>
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="mt-4 text-3xl font-bold text-slate-900">{formatCurrency(exposure.total)}</p>
+            <p className="mt-4 text-xs font-medium text-slate-400 tracking-wide uppercase">Avg: {formatCurrency(exposure.average)}</p>
+          </Link>
+
+          {/* Card 4: Fraud Alerts */}
+          <Link href="/fraud" className="rounded-xl border border-slate-200 bg-white p-6 transition-all hover:bg-slate-50 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Fraud Alerts</p>
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="mt-4 text-3xl font-bold text-slate-900">{fraudData.total}</p>
+            <div className="mt-4 flex gap-2">
+              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${fraudData.highSeverity > 0 ? "bg-red-50 text-red-600" : "bg-slate-50 text-slate-500"}`}>
+                {fraudData.highSeverity} high severity
+              </span>
+            </div>
+          </Link>
+
+          {/* Card 5: Compliance */}
+          <Link href="/compliance" className="rounded-xl border border-slate-200 bg-white p-6 transition-all hover:bg-slate-50 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Compliance</p>
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <p className="mt-4 text-3xl font-bold text-slate-900">{compliantRules}/{totalRules}</p>
+            <p className="mt-4 text-xs font-medium text-emerald-600 uppercase tracking-wide">All rules active</p>
+          </Link>
+
+          {/* Card 6: Throughput */}
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Today&apos;s Throughput</p>
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <p className="mt-4 text-3xl font-bold text-slate-900">{throughput.count}</p>
+            <p className="mt-4 text-xs font-medium text-emerald-600 uppercase tracking-wide">+{throughput.trend}% vs last week</p>
+          </div>
+        </div>
+
+        {/* Secondary Metrics Row - Minimal Horizontal Grid */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="border-l-2 border-slate-200 pl-4 py-1">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg Process Time</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{avgProcessingTime} hrs</p>
+          </div>
+          <div className="border-l-2 border-slate-200 pl-4 py-1">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approval Rate</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{approvalRate.rate}%</p>
+          </div>
+          <div className="border-l-2 border-slate-200 pl-4 py-1">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Readiness</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{avgAIReadiness}%</p>
+          </div>
+          <div className="border-l-2 border-slate-200 pl-4 py-1">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Doc Completeness</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{docCompleteness}%</p>
+          </div>
+        </div>
+
+        {/* Critical Items - Restricted Style */}
+        {(overdueRequests.length > 0 || highValueRequests.length > 0 || fraudData.highSeverity > 0) && (
+          <div className="rounded-xl border border-red-100 bg-red-50/30 p-6">
+            <h2 className="text-sm font-bold text-red-900 uppercase tracking-widest mb-4">Critical Review Items</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {overdueRequests.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-red-700 uppercase">Overdue Pre-Auth</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{overdueRequests.length}</p>
+                  <Link href="/pre-auth" className="mt-3 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1">
+                    REVIEW NOW &rarr;
+                  </Link>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-100">
-                  <div className="metric-fill h-2 rounded-full bg-teal-500" style={{ width: `${autoTriageRate}%` }} />
+              )}
+              {highValueRequests.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-amber-700 uppercase">High-Value (&ge;5L)</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{highValueRequests.length}</p>
+                  <Link href="/pre-auth" className="mt-3 text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1">
+                    REVIEW NOW &rarr;
+                  </Link>
                 </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>Average readiness score</span>
-                  <span className="font-semibold text-slate-900">{avgReadiness}%</span>
+              )}
+              {fraudData.highSeverity > 0 && (
+                <div className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-red-700 uppercase">High Fraud Risk</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{fraudData.highSeverity}</p>
+                  <Link href="/fraud" className="mt-3 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1">
+                    INVESTIGATE &rarr;
+                  </Link>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-100">
-                  <div className="metric-fill h-2 rounded-full bg-indigo-500" style={{ width: `${avgReadiness}%` }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>Compliance coverage</span>
-                  <span className="font-semibold text-slate-900">{complianceRate}%</span>
-                </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-100">
-                  <div className="metric-fill h-2 rounded-full bg-emerald-500" style={{ width: `${complianceRate}%` }} />
-                </div>
-              </div>
+              )}
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Signal Intelligence</h3>
-            <p className="mt-2 text-sm text-slate-500">Copilot flags and workflow signals, summarized for quick decisions.</p>
-            <div className="mt-6 space-y-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Risk flags</p>
-                <p className="metric-rise mt-1 text-xl font-semibold text-slate-900">{suspectedFraud}</p>
-                <p className="text-xs text-slate-500">Medium or high severity signals</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Documentation gaps</p>
-                <p className="metric-rise mt-1 text-xl font-semibold text-slate-900">{awaitingDocs}</p>
-                <p className="text-xs text-slate-500">Cases waiting on missing uploads</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Ready for decision</p>
-                <p className="metric-rise mt-1 text-xl font-semibold text-slate-900">{underReview}</p>
-                <p className="text-xs text-slate-500">Analyst reviews queued</p>
-              </div>
+        )}
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Quick Access Pre-Auth */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Recent Activity</h3>
+              <Link href="/pre-auth" className="text-xs font-bold text-teal-600 hover:text-teal-700 tracking-wide">VIEW ALL &rarr;</Link>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {recentPreAuth.map((req) => {
+                const hospital = getHospital(req.hospitalId);
+                const patient = getPolicyHolder(req.policyHolderId);
+                return (
+                  <Link key={req.id} href={`/pre-auth/${req.id}`} className="block px-6 py-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{req.procedure}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{patient?.name} &bull; {hospital?.name.split(",")[0]}</p>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-sm font-bold text-slate-900">{formatCurrency(req.estimatedAmount)}</p>
+                        <p className={`text-[10px] font-bold uppercase mt-1 tracking-wider ${req.status === "under_review" ? "text-blue-600" : "text-amber-600"
+                          }`}>{req.status.replace("_", " ")}</p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
+
+          {/* Hospital Volume Analytics */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Hospital Volume</h3>
+            </div>
+            <div className="p-6 space-y-5">
+              {hospitalStats.slice(0, 5).map((stat) => {
+                const maxRequests = hospitalStats[0]?.requestCount || 1;
+                const percentage = Math.round((stat.requestCount / maxRequests) * 100);
+                return (
+                  <div key={stat.hospital.id}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-slate-800 uppercase tracking-tight truncate pr-4">{stat.hospital.name}</p>
+                      <p className="text-xs font-bold text-slate-900">{stat.requestCount}</p>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full bg-slate-400" style={{ width: `${percentage}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Minimal AI capabilities row */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-wrap gap-x-8 gap-y-3 justify-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] w-full text-center mb-1">AI-Augmented Core</p>
+          {["Completeness Checks", "Fraud Detection", "IRDAI Compliance", "SLA Monitoring", "Prioritization"].map(cap => (
+            <div key={cap} className="flex items-center gap-1.5 grayscale opacity-60">
+              <svg className="h-3 w-3 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{cap}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

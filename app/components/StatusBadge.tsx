@@ -24,15 +24,27 @@ const fraudSeverity: StatusMap = {
 
 export function PreAuthStatusBadge({ status }: { status: string }) {
   const s = preAuthStatus[status] ?? { label: status, className: "bg-slate-100 text-slate-600" };
-  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${s.className}`}>{s.label}</span>;
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.className}`}>
+      {s.label}
+    </span>
+  );
 }
 
 export function ComplianceStatusBadge({ status }: { status: string }) {
   const s = complianceStatus[status] ?? { label: status, className: "bg-slate-100 text-slate-600" };
-  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${s.className}`}>{s.label}</span>;
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.className}`}>
+      {s.label}
+    </span>
+  );
 }
 
 export function FraudSeverityBadge({ severity }: { severity: string }) {
   const s = fraudSeverity[severity] ?? { label: severity, className: "badge-low" };
-  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${s.className}`}>{s.label}</span>;
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.className}`}>
+      {s.label}
+    </span>
+  );
 }

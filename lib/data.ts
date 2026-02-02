@@ -52,6 +52,24 @@ export const policyHolders: PolicyHolder[] = [
   { id: "P014", name: "Neha Varma", policyNumber: "STAR/HL/2024/661122", insurerId: "I001", sumInsured: 400000, relationship: "self" },
 ];
 
+// Hardcoded relative durations (in minutes) to ensure diversity
+const durations: Record<string, number> = {
+  PA001: 5,
+  PA002: 12,
+  PA003: 28,
+  PA004: 45,
+  PA005: 75,
+  PA006: 150,
+  PA007: 240,
+  PA008: 720,
+  PA009: 1440,
+  PA010: 2880,
+  PA011: 4320,
+  PA012: -10, // Overdue
+};
+
+const now = new Date();
+
 export const preAuthRequests: PreAuthRequest[] = [
   {
     id: "PA001",
@@ -66,7 +84,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Acute STEMI",
     icdCode: "I21.9",
     submittedAt: "2025-01-28T09:30:00Z",
-    slaDeadline: "2025-01-31T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA001"] * 60000).toISOString(),
     aiReadinessScore: 65,
     missingCritical: ["Consent form with patient signature", "Pre-operative investigation reports"],
     complianceStatus: "partial",
@@ -94,7 +112,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Symptomatic Gallstones",
     icdCode: "K80.1",
     submittedAt: "2025-01-29T11:00:00Z",
-    slaDeadline: "2025-02-01T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA002"] * 60000).toISOString(),
     aiReadinessScore: 92,
     missingCritical: [],
     complianceStatus: "compliant",
@@ -122,7 +140,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Severe Osteoarthritis Knee",
     icdCode: "M17.11",
     submittedAt: "2025-01-30T14:20:00Z",
-    slaDeadline: "2025-02-02T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA003"] * 60000).toISOString(),
     aiReadinessScore: 45,
     missingCritical: ["Implant cost breakup", "Doctor's recommendation with stamp", "Pre-operative X-ray/MRI"],
     complianceStatus: "non_compliant",
@@ -150,7 +168,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Senile Cataract, Bilateral",
     icdCode: "H25.1",
     submittedAt: "2025-02-01T10:00:00Z",
-    slaDeadline: "2025-02-03T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA004"] * 60000).toISOString(),
     aiReadinessScore: 0,
     missingCritical: [],
     complianceStatus: "pending_review",
@@ -178,7 +196,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Chronic Rhinosinusitis with Nasal Polyps",
     icdCode: "J33.9",
     submittedAt: "2025-02-02T08:15:00Z",
-    slaDeadline: "2025-02-04T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA005"] * 60000).toISOString(),
     aiReadinessScore: 88,
     missingCritical: [],
     complianceStatus: "compliant",
@@ -206,7 +224,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "BPH with LUTS",
     icdCode: "N40.1",
     submittedAt: "2025-02-02T12:40:00Z",
-    slaDeadline: "2025-02-05T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA006"] * 60000).toISOString(),
     aiReadinessScore: 58,
     missingCritical: ["PSA report", "Uroflowmetry study"],
     complianceStatus: "partial",
@@ -233,7 +251,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Carcinoma Breast, left",
     icdCode: "C50.9",
     submittedAt: "2025-02-03T09:10:00Z",
-    slaDeadline: "2025-02-05T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA007"] * 60000).toISOString(),
     aiReadinessScore: 72,
     missingCritical: ["Histopathology report", "Oncology board notes"],
     complianceStatus: "partial",
@@ -261,7 +279,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Ureteric Calculus",
     icdCode: "N20.1",
     submittedAt: "2025-02-03T14:50:00Z",
-    slaDeadline: "2025-02-06T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA008"] * 60000).toISOString(),
     aiReadinessScore: 95,
     missingCritical: [],
     complianceStatus: "compliant",
@@ -289,7 +307,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Coronary Artery Disease",
     icdCode: "I25.10",
     submittedAt: "2025-02-03T18:05:00Z",
-    slaDeadline: "2025-02-06T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA009"] * 60000).toISOString(),
     aiReadinessScore: 62,
     missingCritical: ["2D Echo report", "Coronary angiography CD"],
     complianceStatus: "partial",
@@ -317,7 +335,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Medial Meniscus Tear",
     icdCode: "S83.241",
     submittedAt: "2025-02-01T07:40:00Z",
-    slaDeadline: "2025-02-03T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA010"] * 60000).toISOString(),
     aiReadinessScore: 98,
     missingCritical: [],
     complianceStatus: "compliant",
@@ -345,7 +363,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Morbid Obesity",
     icdCode: "E66.01",
     submittedAt: "2025-01-31T10:30:00Z",
-    slaDeadline: "2025-02-02T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA011"] * 60000).toISOString(),
     aiReadinessScore: 40,
     missingCritical: ["BMI assessment report", "6-month supervised weight loss documentation"],
     complianceStatus: "non_compliant",
@@ -372,7 +390,7 @@ export const preAuthRequests: PreAuthRequest[] = [
     diagnosis: "Rectal Bleeding",
     icdCode: "K62.5",
     submittedAt: "2025-02-04T09:05:00Z",
-    slaDeadline: "2025-02-06T18:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA012"] * 60000).toISOString(),
     aiReadinessScore: 10,
     missingCritical: ["Signed pre-auth form", "Doctor's recommendation"],
     complianceStatus: "pending_review",
@@ -507,4 +525,181 @@ export function getSimulatedAnalysisResult(paId: string): PreAuthCheckItem[] | n
     ];
   }
   return null;
+}
+
+// ==========================================
+// DASHBOARD UTILITY FUNCTIONS
+// ==========================================
+
+/** Calculate SLA compliance percentage (requests within 48-hour deadline) */
+export function calculateSLACompliance(): { percentage: number; overdueCount: number; totalActive: number } {
+  const now = new Date();
+  const activeRequests = preAuthRequests.filter(
+    (p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft"
+  );
+  const overdueRequests = activeRequests.filter((p) => new Date(p.slaDeadline) < now);
+  const percentage = activeRequests.length > 0
+    ? Math.round(((activeRequests.length - overdueRequests.length) / activeRequests.length) * 100)
+    : 100;
+  return { percentage, overdueCount: overdueRequests.length, totalActive: activeRequests.length };
+}
+
+/** Calculate total financial exposure (sum of pending pre-auth amounts) */
+export function calculateTotalExposure(): { total: number; average: number; count: number } {
+  const pendingRequests = preAuthRequests.filter(
+    (p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft"
+  );
+  const total = pendingRequests.reduce((sum, p) => sum + p.estimatedAmount, 0);
+  const average = pendingRequests.length > 0 ? Math.round(total / pendingRequests.length) : 0;
+  return { total, average, count: pendingRequests.length };
+}
+
+/** Calculate approval rate (approved vs total decided) */
+export function calculateApprovalRate(): { rate: number; approved: number; rejected: number } {
+  const approved = preAuthRequests.filter((p) => p.status === "approved").length;
+  const rejected = preAuthRequests.filter((p) => p.status === "rejected").length;
+  const total = approved + rejected;
+  const rate = total > 0 ? Math.round((approved / total) * 100) : 0;
+  return { rate, approved, rejected };
+}
+
+/** Get average processing time (simulated at 28 hours for demo) */
+export function calculateAverageProcessingTime(): number {
+  return 28;
+}
+
+/** Get overdue pre-auth requests */
+export function getOverdueRequests(): PreAuthRequest[] {
+  const now = new Date();
+  return preAuthRequests.filter(
+    (p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft" && new Date(p.slaDeadline) < now
+  );
+}
+
+/** Get high-value requests (≥₹5,00,000) */
+export function getHighValueRequests(): PreAuthRequest[] {
+  return preAuthRequests.filter(
+    (p) => p.estimatedAmount >= 500000 && p.status !== "approved" && p.status !== "rejected" && p.status !== "draft"
+  );
+}
+
+/** Calculate average AI readiness score */
+export function calculateAverageAIReadiness(): number {
+  const activeRequests = preAuthRequests.filter(
+    (p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft"
+  );
+  if (activeRequests.length === 0) return 0;
+  return Math.round(activeRequests.reduce((sum, p) => sum + p.aiReadinessScore, 0) / activeRequests.length);
+}
+
+/** Calculate document completeness (% of requests with no missing critical docs) */
+export function calculateDocumentCompleteness(): number {
+  const activeRequests = preAuthRequests.filter(
+    (p) => p.status !== "approved" && p.status !== "rejected" && p.status !== "draft"
+  );
+  if (activeRequests.length === 0) return 100;
+  const completeRequests = activeRequests.filter((p) => p.missingCritical.length === 0);
+  return Math.round((completeRequests.length / activeRequests.length) * 100);
+}
+
+/** Get hospital statistics */
+export function getHospitalStats(): { hospital: Hospital; requestCount: number; avgAmount: number; totalAmount: number }[] {
+  const hospitalMap = new Map<string, { count: number; totalAmount: number }>();
+
+  preAuthRequests.forEach((p) => {
+    const existing = hospitalMap.get(p.hospitalId) || { count: 0, totalAmount: 0 };
+    hospitalMap.set(p.hospitalId, {
+      count: existing.count + 1,
+      totalAmount: existing.totalAmount + p.estimatedAmount,
+    });
+  });
+
+  const stats: { hospital: Hospital; requestCount: number; avgAmount: number; totalAmount: number }[] = [];
+  hospitalMap.forEach((value, hospitalId) => {
+    const hospital = getHospital(hospitalId);
+    if (hospital) {
+      stats.push({
+        hospital,
+        requestCount: value.count,
+        avgAmount: Math.round(value.totalAmount / value.count),
+        totalAmount: value.totalAmount,
+      });
+    }
+  });
+
+  return stats.sort((a, b) => b.requestCount - a.requestCount);
+}
+
+/** Get insurer statistics */
+export function getInsurerStats(): { insurer: Insurer; requestCount: number; totalAmount: number }[] {
+  const insurerMap = new Map<string, { count: number; totalAmount: number }>();
+
+  preAuthRequests.forEach((p) => {
+    const existing = insurerMap.get(p.insurerId) || { count: 0, totalAmount: 0 };
+    insurerMap.set(p.insurerId, {
+      count: existing.count + 1,
+      totalAmount: existing.totalAmount + p.estimatedAmount,
+    });
+  });
+
+  const stats: { insurer: Insurer; requestCount: number; totalAmount: number }[] = [];
+  insurerMap.forEach((value, insurerId) => {
+    const insurer = getInsurer(insurerId);
+    if (insurer) {
+      stats.push({
+        insurer,
+        requestCount: value.count,
+        totalAmount: value.totalAmount,
+      });
+    }
+  });
+
+  return stats.sort((a, b) => b.requestCount - a.requestCount);
+}
+
+/** Get daily throughput (requests processed today - simulated for demo) */
+export function getDailyThroughput(): { count: number; trend: number } {
+  // Simulated data for demo
+  return { count: 12, trend: 15 }; // 15% improvement vs last week
+}
+
+/** Get status distribution for active requests */
+export function getStatusDistribution(): { status: string; count: number; color: string; label: string }[] {
+  const statusMap: Record<string, { count: number; color: string; label: string }> = {
+    submitted: { count: 0, color: "bg-blue-500", label: "Submitted" },
+    awaiting_docs: { count: 0, color: "bg-amber-500", label: "Awaiting Docs" },
+    under_review: { count: 0, color: "bg-purple-500", label: "Under Review" },
+    approved: { count: 0, color: "bg-emerald-500", label: "Approved" },
+    rejected: { count: 0, color: "bg-red-500", label: "Rejected" },
+    draft: { count: 0, color: "bg-slate-400", label: "Draft" },
+  };
+
+  preAuthRequests.forEach((p) => {
+    if (statusMap[p.status]) {
+      statusMap[p.status].count++;
+    }
+  });
+
+  return Object.entries(statusMap)
+    .filter(([, value]) => value.count > 0)
+    .map(([status, value]) => ({ status, ...value }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** Get open fraud alerts */
+export function getOpenFraudAlerts(): { total: number; highSeverity: number; alerts: FraudAlert[] } {
+  const openAlerts = fraudAlerts.filter((f) => f.status === "open" || f.status === "under_investigation");
+  const highSeverity = openAlerts.filter((f) => f.severity === "high").length;
+  return { total: openAlerts.length, highSeverity, alerts: openAlerts };
+}
+
+/** Format fraud type for display */
+export function formatFraudType(type: string): string {
+  const typeMap: Record<string, string> = {
+    duplicate_billing: "Duplicate Billing",
+    upcoding: "Upcoding",
+    phantom_billing: "Phantom Billing",
+    policy_misuse: "Policy Misuse",
+  };
+  return typeMap[type] || type;
 }
