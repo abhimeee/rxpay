@@ -8,7 +8,9 @@ import { PageHeader } from "../components/PageHeader";
 
 export default function PreAuthQueuePage() {
   const router = useRouter();
-  const urgentRequests = preAuthRequests.slice(0, 3);
+  const urgentRequests = preAuthRequests
+    .filter((pa) => pa.status === "under_review")
+    .slice(0, 3);
 
   return (
     <div className="min-h-screen bg-slate-50">
