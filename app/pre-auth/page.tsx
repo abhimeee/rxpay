@@ -13,7 +13,7 @@ export default function PreAuthQueuePage() {
     <div className="min-h-screen bg-slate-50">
       <PageHeader
         title="Pre-Auth Queue"
-        subtitle="AI checks each request for completeness and IRDAI compliance. Assigned to TPA analysts for review."
+        subtitle="AI checks each request for completeness and IRDAI compliance"
         titleVariant="navy"
       />
 
