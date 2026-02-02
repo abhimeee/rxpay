@@ -9,6 +9,7 @@ export default function CompliancePage() {
       <PageHeader
         title="Compliance"
         subtitle="IRDAI-aligned checks. Copilot ensures pre-auth and claims workflows stay compliant with Indian government regulations."
+        titleVariant="navy"
       />
 
       <div className="p-8">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { RxPayLogo } from "./RxPayLogo";
+import Image from "next/image";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -15,10 +15,6 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-30 h-screen w-56 flex-shrink-0 border-r border-slate-700/50 bg-slate-900 text-white sidebar-scroll overflow-y-auto">
-      <div className="flex h-16 items-center gap-3 border-b border-slate-700/50 px-4">
-        <RxPayLogo className="h-8 w-auto flex-shrink-0" />
-        <span className="text-lg font-semibold text-white">RxPay</span>
-      </div>
       <nav className="space-y-0.5 p-3">
         {nav.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));

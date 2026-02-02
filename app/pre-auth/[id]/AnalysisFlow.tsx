@@ -170,7 +170,7 @@ export function AnalysisFlow({
           </p>
           <div className="mt-6 flex items-center gap-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/20 text-2xl font-bold">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/20 text-[22px] font-bold leading-none tracking-tight text-center">
                 {score}%
               </div>
               <div>

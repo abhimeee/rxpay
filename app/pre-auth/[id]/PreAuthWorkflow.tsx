@@ -10,13 +10,13 @@ const STAGE_IDS = WORKFLOW_STAGES.map((s) => s.id);
 
 const providerFraudBreakdowns = [
   {
-    title: "Billing for procedures not performed (phantom billing)",
+    title: "Billing for procedures not performed",
     assessment: "Unlikely",
     detail: "Docs and timestamps align with procedure claims.",
   },
   {
     title:
-      "Billing for procedures more frequently than clinically justified (e.g., imaging every week instead of monthly)",
+      "Billing for procedures more frequently than clinically justified",
     assessment: "Likely",
     detail: "Utilization exceeds peer benchmarks for diagnosis.",
   },

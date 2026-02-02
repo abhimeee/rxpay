@@ -3,7 +3,7 @@
 export const currentTpa = {
   id: "akna",
   name: "AKNA",
-  tagline: "AI Copilot for pre-auth, fraud detection & IRDAI compliance",
+  tagline: "AI Copilot for claims, pre-auth & compliance",
 } as const;
 
 export type TpaId = (typeof currentTpa)["id"];

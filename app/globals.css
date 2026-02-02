@@ -67,3 +67,40 @@ body {
 .workflow-stage-content {
   animation: workflow-fade-slide 0.3s ease-out;
 }
+
+/* Minimal metric animations for dashboard */
+@keyframes metric-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes metric-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.metric-rise {
+  animation: metric-rise 0.5s ease-out;
+}
+
+.metric-fill {
+  transform-origin: left;
+  animation: metric-fill 0.8s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-rise,
+  .metric-fill {
+    animation: none;
+  }
+}

@@ -14,11 +14,13 @@ export default function PreAuthQueuePage() {
       <PageHeader
         title="Pre-Auth Queue"
         subtitle="AI checks each request for completeness and IRDAI compliance. Assigned to TPA analysts for review."
+        titleVariant="navy"
       />
 
       <div className="p-8">
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <table className="w-full text-left">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-sm font-medium text-slate-600">
                 <th className="px-5 py-4">Claim / Pre-Auth</th>
@@ -57,7 +59,7 @@ export default function PreAuthQueuePage() {
                       hasSuspectedFraud ? "bg-red-50/60" : ""
                     }`}
                   >
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 w-[220px]">
                       <span className="font-mono text-sm font-medium text-slate-800">{pa.claimId}</span>
                       <span className="ml-2 text-slate-400 text-xs">/{formatPreAuthKey(pa.id)}</span>
                     </td>
@@ -100,7 +102,8 @@ export default function PreAuthQueuePage() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </div>
     </div>
