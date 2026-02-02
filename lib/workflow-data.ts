@@ -872,7 +872,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     coding: {
       icd10: [{ id: "icd1", type: "icd10", code: "K62.5", description: "Hemorrhage of anus and rectum", status: "missing_specificity" }],
-      cpt: [{ id: "cpt1", type: "cpt", code: "45380", description: "Colonoscopy with biopsy", status: "pending" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "45380", description: "Colonoscopy with biopsy", status: "missing_specificity" }],
     },
     medicalNecessity: [
       { id: "mn1", level: 1, source: "IRDAI Guidelines", finding: "Diagnostic colonoscopy covered with clinical notes.", status: "conditional" },
