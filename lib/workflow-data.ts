@@ -901,6 +901,385 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     p2pRequired: false,
   },
+  PA013: {
+    requestSummary: {
+      admissionType: "planned",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID (Aadhaar)", value: "XXXX-XXXX-1122", present: true },
+        { label: "Policy document", value: "ICICI/HL/2023/123321", present: true },
+        { label: "Doctor notes", value: "Menorrhagia, multiple large fibroids", present: true },
+        { label: "Provisional diagnosis", value: "D25.9 – Leiomyoma of uterus", present: true },
+        { label: "Proposed treatment", value: "Total abdominal hysterectomy", present: true },
+        { label: "Estimated cost", value: "₹3,15,000", present: true },
+        { label: "USG Abdomen/Pelvis", value: "Fibroids 8cm, 6cm detected", present: true },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received", timestamp: "2025-02-04 10:15", status: "done" },
+      { id: "t2", title: "Assigned to reviewer", timestamp: "2025-02-04 10:30", status: "done", meta: [{ label: "Assignee", value: "Anita Desai" }] },
+      { id: "t3", title: "Current status", timestamp: "2025-02-04 11:00", status: "current", detail: "Under review for medical necessity." },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active", detail: "Premiums paid." },
+      { id: "e2", label: "Coverage dates", status: "pass", value: "Within validity", detail: "Valid." },
+      { id: "e3", label: "Benefit limit", status: "pass", value: "₹15L annual", detail: "Within limit." },
+      { id: "e4", label: "Waiting period", status: "pass", value: "Elapsed", detail: "2-year period for fibroids completed." },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "D25.9", description: "Leiomyoma of uterus, unspecified", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "58150", description: "Total abdominal hysterectomy", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "IRDAI Guidelines", finding: "Hysterectomy covered for symptomatic fibroids.", status: "met" },
+      { id: "mn2", level: 2, source: "Clinical notes", finding: "Failed conservative management documented.", status: "met" },
+    ],
+    medicalNecessityScore: 89,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "D25.9",
+        diagnosisDescription: "Uterine fibroids",
+        procedureCode: "58150",
+        procedureDescription: "Hysterectomy",
+        irdaApproved: true,
+        policyApproved: true,
+        aiSimilarityPct: 82,
+        aiSummary: "High approval rate for fibroids >5cm with menorrhagia symptoms.",
+        sourceUrl: "https://www.ncbi.nlm.nih.gov/books/NBK546682/",
+        sourceLabel: "Evidence",
+      },
+    ],
+    fraudFlags: [{ id: "f1", category: "document", severity: "none", description: "Consistent documentation." }],
+    queries: [],
+    p2pRequired: false,
+  },
+  PA014: {
+    requestSummary: {
+      admissionType: "emergency",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-3344", present: true },
+        { label: "Trauma summary", value: "RTA, severe pain left thigh", present: true },
+        { label: "Provisional diagnosis", value: "S72.30 – Fracture shaft of femur", present: true },
+        { label: "Proposed treatment", value: "ORIF with intramedullary nail", present: true },
+        { label: "Estimated cost", value: "₹1,20,000", present: true },
+        { label: "X-ray Femur", value: "Not received", present: false },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received (ER)", timestamp: "2025-02-04 11:45", status: "done" },
+      { id: "t2", title: "Query sent", timestamp: "2025-02-04 12:15", status: "info", detail: "X-ray report requested." },
+      { id: "t3", title: "Current status", timestamp: "2025-02-04 12:30", status: "current", detail: "Awaiting X-ray report." },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active", detail: "Group insurance." },
+      { id: "e2", label: "Waiting period", status: "pass", value: "Waived", detail: "Accidental injury; 30-day waiver applies." },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "S72.30", description: "Fracture of shaft of femur", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "27506", description: "ORIF femur shaft fracture", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Trauma protocol", finding: "Immediate surgical fixation required for femur fracture.", status: "met" },
+    ],
+    medicalNecessityScore: 78,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "S72.30",
+        diagnosisDescription: "Femur fracture",
+        procedureCode: "27506",
+        procedureDescription: "ORIF",
+        irdaApproved: true,
+        policyApproved: true,
+        aiSimilarityPct: 88,
+        aiSummary: "Emergency ORIF for long bone fractures is standard of care.",
+        sourceUrl: "https://www.ncbi.nlm.nih.gov/books/NBK459228/",
+        sourceLabel: "Evidence",
+      },
+    ],
+    fraudFlags: [{ id: "f1", category: "provider", severity: "none", description: "Network hospital." }],
+    queries: [{ id: "q1", question: "Please upload X-ray report of left femur.", status: "open", dueDate: "2025-02-05" }],
+    p2pRequired: false,
+  },
+  PA015: {
+    requestSummary: {
+      admissionType: "planned",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-9988", present: true },
+        { label: "Oncology notes", value: "Chemotherapy Cycle #3", present: true },
+        { label: "Diagnosis", value: "C34.9 – Lung Cancer", present: true },
+        { label: "Proposed treatment", value: "Injection Pemetrexed + Carboplatin", present: true },
+        { label: "Estimated cost", value: "₹65,000", present: true },
+        { label: "Biopsy report", value: "Not attached", present: false },
+        { label: "PET Scan", value: "Not attached", present: false },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received", timestamp: "2025-02-04 13:20", status: "done" },
+      { id: "t2", title: "Documentation check", timestamp: "2025-02-04 13:45", status: "done", detail: "Missing core oncology docs." },
+      { id: "t3", title: "Current status", timestamp: "2025-02-04 14:00", status: "current", detail: "Awaiting documents." },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active" },
+      { id: "e2", label: "Benefit limit", status: "pass", value: "₹8L annual" },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "C34.9", description: "Malignant neoplasm of lung", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "96413", description: "Chemotherapy administration, IV infusion", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Oncology Guidelines", finding: "Pemetrexed + Carboplatin is standard for non-squamous NSCLC.", status: "met" },
+      { id: "mn2", level: 2, source: "Documentation", finding: "Missing staging and biopsy confirmation.", status: "not_met" },
+    ],
+    medicalNecessityScore: 42,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "C34.9",
+        diagnosisDescription: "Lung Cancer",
+        procedureCode: "96413",
+        procedureDescription: "Chemotherapy",
+        irdaApproved: true,
+        policyApproved: false,
+        aiSimilarityPct: 45,
+        aiSummary: "Oncology claims require biopsy and staging for the first few cycles.",
+        sourceUrl: "https://www.nccn.org/guidelines/",
+        sourceLabel: "Evidence",
+      },
+    ],
+    fraudFlags: [{ id: "f1", category: "document", severity: "high", description: "Core medical reports missing for expensive treatment." }],
+    queries: [{ id: "q1", question: "Please provide histopathology report and staging PET scan.", status: "open", dueDate: "2025-02-07" }],
+    p2pRequired: false,
+  },
+  PA016: {
+    requestSummary: {
+      admissionType: "planned",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-7766", present: true },
+        { label: "Policy document", value: "STAR/HL/2024/776655", present: true },
+        { label: "Cardiology notes", value: "Severe symptomatic aortic stenosis", present: true },
+        { label: "Diagnosis", value: "I35.0 – Nonrheumatic aortic stenosis", present: true },
+        { label: "Proposed treatment", value: "Surgical aortic valve replacement", present: true },
+        { label: "Estimated cost", value: "₹7,50,000", present: true },
+        { label: "Echo report", value: "AVA 0.7 cm2, gradient 45 mmHg", present: true },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received", timestamp: "2025-02-04 15:10", status: "done" },
+      { id: "t2", title: "Assigned to reviewer", timestamp: "2025-02-04 15:25", status: "done", meta: [{ label: "Assignee", value: "Kavitha Krishnan" }] },
+      { id: "t3", title: "Current status", timestamp: "2025-02-04 15:40", status: "current", detail: "Medical review ongoing." },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active" },
+      { id: "e2", label: "Benefit limit", status: "pass", value: "₹20L annual" },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "I35.0", description: "Nonrheumatic aortic stenosis", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "33405", description: "Aortic valve replacement", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Cardiac guidelines", finding: "AVR indicated for symptomatic severe AS.", status: "met" },
+    ],
+    medicalNecessityScore: 92,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "I35.0",
+        diagnosisDescription: "Aortic stenosis",
+        procedureCode: "33405",
+        procedureDescription: "Valve replacement",
+        irdaApproved: true,
+        policyApproved: true,
+        aiSimilarityPct: 85,
+        aiSummary: "Confirmed severe AS (AVA < 1cm2) with symptoms has high approval rates.",
+        sourceUrl: "https://www.acc.org/guidelines",
+        sourceLabel: "Evidence",
+      },
+    ],
+    fraudFlags: [{ id: "f1", category: "document", severity: "none", description: "Documents verified." }],
+    queries: [],
+    p2pRequired: false,
+  },
+  PA017: {
+    requestSummary: {
+      admissionType: "emergency",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-1122", present: true },
+        { label: "Clinical notes", value: "High grade fever, myalgia, rash", present: true },
+        { label: "Diagnosis", value: "A91 – Dengue hemorrhagic fever", present: true },
+        { label: "Proposed treatment", value: "IV fluids, platelet monitoring", present: true },
+        { label: "Estimated cost", value: "₹42,000", present: true },
+        { label: "NS1 Antigen", value: "Not attached", present: false },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received (ER)", timestamp: "2025-02-04 16:30", status: "done" },
+      { id: "t2", title: "Query sent", timestamp: "2025-02-04 16:50", status: "info", detail: "Lab reports requested." },
+      { id: "t3", title: "Current status", timestamp: "2025-02-04 17:00", status: "current", detail: "Awaiting Lab reports." },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active" },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "A91", description: "Dengue hemorrhagic fever", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "99222", description: "Initial hospital care", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Medicine guidelines", finding: "Inpatient care for Dengue with warning signs.", status: "conditional" },
+    ],
+    medicalNecessityScore: 35,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "A91",
+        diagnosisDescription: "Dengue",
+        procedureCode: "99222",
+        procedureDescription: "Inpatient care",
+        irdaApproved: true,
+        policyApproved: true,
+        aiSimilarityPct: 65,
+        aiSummary: "Lab confirmation of Dengue is strictly required for reimbursement/cashless.",
+        sourceUrl: "https://www.who.int/news-room/fact-sheets/detail/dengue-and-severe-dengue",
+        sourceLabel: "Evidence",
+      },
+    ],
+    fraudFlags: [{ id: "f1", category: "document", severity: "medium", description: "Lab report missing for fever management." }],
+    queries: [{ id: "q1", question: "Please upload NS1/IgM positive report and serial platelet counts.", status: "open", dueDate: "2025-02-06" }],
+    p2pRequired: false,
+  },
+  PA018: {
+    requestSummary: {
+      admissionType: "planned",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-5544", present: true },
+        { label: "Clinical notes", value: "Ventral hernia, reducible", present: true },
+        { label: "Diagnosis", value: "K43.9 – Ventral hernia", present: true },
+        { label: "Proposed treatment", value: "Laparoscopic IPOM", present: true },
+        { label: "Estimated cost", value: "₹1,85,000", present: true },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case drafted", timestamp: "2025-02-04 17:20", status: "done" },
+      { id: "t2", title: "Current status", timestamp: "2025-02-04 17:30", status: "current", detail: "Awaiting hospital submission." },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active" },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "K43.9", description: "Ventral hernia without obstruction", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "49652", description: "Laparoscopic ventral hernia repair", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Surgical guidelines", finding: "IPOM indicated for symptomatic ventral hernia.", status: "met" },
+    ],
+    medicalNecessityScore: 10,
+    medicalNecessityInsights: [],
+    fraudFlags: [],
+    queries: [],
+    p2pRequired: false,
+  },
+  PA019: {
+    requestSummary: {
+      admissionType: "planned",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-9136", present: true },
+        { label: "Nephrology notes", value: "Stage V CKD, planning for HD", present: true },
+        { label: "Diagnosis", value: "N18.5 – CKD Stage V", present: true },
+        { label: "Proposed treatment", value: "AV Fistula creation", present: true },
+        { label: "Estimated cost", value: "₹55,000", present: true },
+        { label: "Creatinine", value: "8.2 mg/dL", present: true },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received", timestamp: "2025-02-01 09:00", status: "done" },
+      { id: "t2", title: "Documentation verified", timestamp: "2025-02-01 09:20", status: "done" },
+      { id: "t3", title: "Approved", timestamp: "2025-02-01 10:15", status: "done" },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active" },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "N18.5", description: "Chronic kidney disease, stage 5", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "36821", description: "AV fistula creation, direct anastomosis", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Nephrology guidelines", finding: "AV fistula creation indicated for CKD Stage V.", status: "met" },
+    ],
+    medicalNecessityScore: 95,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "N18.5",
+        diagnosisDescription: "CKD Stage 5",
+        procedureCode: "36821",
+        procedureDescription: "AV Fistula",
+        irdaApproved: true,
+        policyApproved: true,
+        aiSimilarityPct: 94,
+        aiSummary: "Fistula creation for Stage 5 CKD is standard preventative care for dialysis.",
+        sourceUrl: "https://www.kidney.org/professionals/KDOQI/guidelines",
+        sourceLabel: "Evidence",
+      },
+    ],
+    fraudFlags: [],
+    queries: [],
+    p2pRequired: false,
+  },
+  PA020: {
+    requestSummary: {
+      admissionType: "planned",
+      submittedWithinSLA: true,
+      items: [
+        { label: "Patient ID", value: "XXXX-XXXX-7712", present: true },
+        { label: "Clinical notes", value: "Severe toothache, dental caries", present: true },
+        { label: "Diagnosis", value: "K02.9 – Dental caries, unspecified", present: true },
+        { label: "Proposed treatment", value: "RCT with PFM Crown", present: true },
+        { label: "Estimated cost", value: "₹1,25,000", present: true },
+      ],
+    },
+    timeline: [
+      { id: "t1", title: "Case received", timestamp: "2025-02-02 14:00", status: "done" },
+      { id: "t2", title: "Eligibility check", timestamp: "2025-02-02 14:30", status: "done", detail: "Dental exclusion identified." },
+      { id: "t3", title: "Rejected", timestamp: "2025-02-02 15:00", status: "done" },
+    ],
+    eligibility: [
+      { id: "e1", label: "Policy status", status: "pass", value: "Active" },
+      { id: "e2", label: "Dental coverage", status: "fail", value: "Excluded", detail: "Policy exclusion clause G.4.2 applies." },
+    ],
+    coding: {
+      icd10: [{ id: "icd1", type: "icd10", code: "K02.9", description: "Dental caries, unspecified", status: "valid" }],
+      cpt: [{ id: "cpt1", type: "cpt", code: "D3330", description: "Root canal therapy; molar", status: "valid" }],
+    },
+    medicalNecessity: [
+      { id: "mn1", level: 1, source: "Dental guidelines", finding: "RCT indicated for pulpitis due to caries.", status: "met" },
+    ],
+    medicalNecessityScore: 50,
+    medicalNecessityInsights: [
+      {
+        id: "mni1",
+        diagnosisCode: "K02.9",
+        diagnosisDescription: "Dental caries",
+        procedureCode: "D3330",
+        procedureDescription: "Root canal",
+        irdaApproved: false,
+        policyApproved: false,
+        aiSimilarityPct: 20,
+        aiSummary: "Dental procedures are standard exclusions in basic health policies unless trauma-related.",
+        sourceUrl: "https://www.irdai.gov.in/",
+        sourceLabel: "Regulation",
+      },
+    ],
+    fraudFlags: [],
+    queries: [],
+    p2pRequired: false,
+  },
 };
 
 export function getWorkflowData(preAuthId: string): PreAuthWorkflowData | null {
@@ -908,7 +1287,6 @@ export function getWorkflowData(preAuthId: string): PreAuthWorkflowData | null {
 }
 
 export const WORKFLOW_STAGES: { id: WorkflowStageId; title: string; shortTitle: string; description: string }[] = [
-  { id: "request_initiation", shortTitle: "Request", title: "Request Initiation", description: "What the hospital TPA desk collected and submitted." },
   { id: "documentation", shortTitle: "Docs", title: "Documentation Completeness", description: "Verify completeness against IRDAI checklist." },
   { id: "eligibility", shortTitle: "Eligibility", title: "Eligibility & Coverage", description: "Policy status, dates, service coverage, limits, waiting period." },
   { id: "medical_coding", shortTitle: "Coding", title: "Medical Coding Accuracy", description: "ICD-10 and CPT validation." },

@@ -13,7 +13,7 @@ import {
   tpaAssignees,
 } from "@/lib/data";
 import { getWorkflowData } from "@/lib/workflow-data";
-import { PreAuthStatusBadge, ComplianceStatusBadge } from "../components/StatusBadge";
+import { PreAuthStatusBadge } from "../components/StatusBadge";
 import { PageHeader } from "../components/PageHeader";
 
 export default function PreAuthQueuePage() {
@@ -79,30 +79,25 @@ export default function PreAuthQueuePage() {
     return requests;
   }, [search, statusFilter, hospitalFilter, amountFilter, assigneeFilter, sortBy]);
 
-  const getTimeRemaining = (deadline: string) => {
+  const getSLAStatus = (deadline: string) => {
     const now = new Date();
     const then = new Date(deadline);
     const diffMs = then.getTime() - now.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMins / 60);
 
-    if (diffMins < 0) return "Overdue";
-    if (diffHours > 0) return `${diffHours}h ${diffMins % 60}m remaining`;
-    return `${diffMins}m remaining`;
+    if (diffMins < 0) return { label: "Overdue", type: "overdue" };
+    if (diffMins <= 30) return { label: `${diffMins}m remaining`, type: "urgent" };
+    if (diffHours > 0) return { label: `${diffHours}h ${diffMins % 60}m remaining`, type: "normal" };
+    return { label: `${diffMins}m remaining`, type: "normal" };
   };
 
-  const isUrgent = (deadline: string) => {
-    const now = new Date();
-    const then = new Date(deadline);
-    const diffMins = Math.floor((then.getTime() - now.getTime()) / (1000 * 60));
-    return diffMins > 0 && diffMins <= 30;
-  };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <PageHeader
         title="Pre-Auth Queue"
-        subtitle="AI checks each request for completeness and IRDAI compliance"
+        subtitle="AI checks each request for completeness and accuracy"
         titleVariant="navy"
       />
 
@@ -219,22 +214,19 @@ export default function PreAuthQueuePage() {
                 const hospital = getHospital(pa.hospitalId);
                 const holder = getPolicyHolder(pa.policyHolderId);
                 const assignee = pa.assigneeId ? getAssignee(pa.assigneeId) : null;
-                const urgent = isUrgent(pa.slaDeadline);
-                const timeRemaining = getTimeRemaining(pa.slaDeadline);
+                const sla = getSLAStatus(pa.slaDeadline);
 
                 return (
                   <div
                     key={pa.id}
                     onClick={() => router.push(`/pre-auth/${pa.id}`)}
-                    className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${urgent
-                      ? "border-amber-300 bg-amber-50/50 shadow-sm shadow-amber-100/50"
-                      : "bg-white border-slate-100 hover:shadow-slate-200/50"
+                    className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${sla.type === "overdue"
+                      ? "border-orange-300 bg-orange-50/50 shadow-sm shadow-orange-100/50"
+                      : sla.type === "urgent"
+                        ? "border-amber-300 bg-amber-50/50 shadow-sm shadow-amber-100/50"
+                        : "bg-white border-slate-100 hover:shadow-slate-200/50"
                       }`}
                   >
-                    {urgent && (
-                      <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400" />
-                    )}
-
                     <div className="p-5 flex flex-col lg:flex-row lg:items-center gap-6">
                       {/* Left: Claim & Procedure */}
                       <div className="flex-grow min-w-0 lg:max-w-[30%]">
@@ -243,8 +235,8 @@ export default function PreAuthQueuePage() {
                             {formatPreAuthKey(pa.id)}
                           </span>
                           <span className="text-sm font-bold text-slate-900 leading-none">{pa.claimId}</span>
-                          {urgent && (
-                            <span className="ml-1 animate-pulse h-2 w-2 rounded-full bg-amber-500" />
+                          {sla.type !== "normal" && (
+                            <span className={`ml-1 animate-pulse h-2 w-2 rounded-full ${sla.type === "overdue" ? "bg-orange-500" : "bg-amber-500"}`} />
                           )}
                         </div>
                         <h3 className="text-base font-bold text-slate-900 truncate group-hover:text-slate-600 transition-colors mt-2">
@@ -254,9 +246,11 @@ export default function PreAuthQueuePage() {
                           <p className="text-xs text-slate-500 font-medium uppercase tracking-tight">
                             ICD: {pa.icdCode}
                           </p>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${urgent ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${sla.type === "overdue" ? "bg-orange-100 text-orange-700" :
+                            sla.type === "urgent" ? "bg-amber-100 text-amber-700" :
+                              "bg-slate-100 text-slate-500"
                             }`}>
-                            {timeRemaining}
+                            {sla.label}
                           </span>
                         </div>
                       </div>
@@ -303,10 +297,6 @@ export default function PreAuthQueuePage() {
                     {/* Footer: Compliance & Actions */}
                     <div className="px-5 py-3.5 bg-slate-50/30 border-t border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Compliance</span>
-                          <ComplianceStatusBadge status={pa.complianceStatus} />
-                        </div>
                         {pa.aiReadinessScore > 0 && (
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Approval Likelihood</span>

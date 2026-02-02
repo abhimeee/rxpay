@@ -8,7 +8,6 @@ import type {
   PreAuthCheckItem,
   Claim,
   FraudAlert,
-  ComplianceRule,
   TPAAssignee,
 } from "./types";
 
@@ -50,6 +49,12 @@ export const policyHolders: PolicyHolder[] = [
   { id: "P012", name: "Maya Iyer", policyNumber: "NIVA/HL/2023/114466", insurerId: "I005", sumInsured: 500000, relationship: "self" },
   { id: "P013", name: "Rohit Gulati", policyNumber: "HDFC/HL/2022/778899", insurerId: "I002", sumInsured: 1000000, relationship: "self" },
   { id: "P014", name: "Neha Varma", policyNumber: "STAR/HL/2024/661122", insurerId: "I001", sumInsured: 400000, relationship: "self" },
+  { id: "P015", name: "Suresh Prabhu", policyNumber: "ICICI/HL/2023/123321", insurerId: "I003", sumInsured: 1500000, relationship: "self" },
+  { id: "P016", name: "Meena Deshmukh", policyNumber: "NIVA/HL/2024/445566", insurerId: "I005", sumInsured: 600000, relationship: "self" },
+  { id: "P017", name: "Anil Kumble", policyNumber: "CARE/HL/2023/998877", insurerId: "I004", sumInsured: 800000, relationship: "self" },
+  { id: "P018", name: "Sunita Williams", policyNumber: "STAR/HL/2024/776655", insurerId: "I001", sumInsured: 2000000, relationship: "self" },
+  { id: "P019", name: "Rajat Sharma", policyNumber: "HDFC/HL/2023/112233", insurerId: "I002", sumInsured: 500000, relationship: "self" },
+  { id: "P020", name: "Lakshmi Iyer", policyNumber: "ICICI/HL/2024/554433", insurerId: "I003", sumInsured: 1000000, relationship: "self" },
 ];
 
 // Hardcoded relative durations (in minutes) to ensure diversity
@@ -66,6 +71,14 @@ const durations: Record<string, number> = {
   PA010: 2880,
   PA011: 4320,
   PA012: -10, // Overdue
+  PA013: 15,
+  PA014: 35,
+  PA015: 55,
+  PA016: 90,
+  PA017: 120,
+  PA018: 180,
+  PA019: 300,
+  PA020: 600,
 };
 
 const now = new Date();
@@ -87,16 +100,14 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA001"] * 60000).toISOString(),
     aiReadinessScore: 65,
     missingCritical: ["Consent form with patient signature", "Pre-operative investigation reports"],
-    complianceStatus: "partial",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "₹2,85,000" },
-      { id: "c4", label: "Consent form with patient signature", irdaiRef: "IRDAI Circular 12/2016", status: "missing", aiSuggestion: "Request signed consent from hospital. Template available per IRDAI guidelines." },
-      { id: "c5", label: "Pre-operative investigation reports", irdaiRef: "IRDAI Circular 12/2016", status: "missing", aiSuggestion: "ECG, Troponin, Lipid profile required for cardiac procedures." },
-      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof (Aadhaar/Passport)", status: "complete", value: "Aadhaar linked" },
-      { id: "c8", label: "Waiting period compliance check", irdaiRef: "Policy terms", status: "complete", value: "24 months elapsed" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹2,85,000" },
+      { id: "c4", label: "Consent form with patient signature", status: "missing" },
+      { id: "c5", label: "Pre-operative investigation reports", status: "missing" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof (Aadhaar/Passport)", status: "submitted", value: "Aadhaar linked" },
     ],
   },
   {
@@ -115,16 +126,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA002"] * 60000).toISOString(),
     aiReadinessScore: 92,
     missingCritical: [],
-    complianceStatus: "compliant",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹1,75,000" },
-      { id: "c4", label: "Consent form with patient signature", status: "complete", value: "Received" },
-      { id: "c5", label: "Pre-operative investigation reports", status: "complete", value: "USG, LFT attached" },
-      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof", status: "complete", value: "Verified" },
-      { id: "c8", label: "Waiting period compliance", status: "complete", value: "Compliant" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹1,75,000" },
+      { id: "c4", label: "Consent form with patient signature", status: "submitted", value: "Received" },
+      { id: "c5", label: "Pre-operative investigation reports", status: "submitted", value: "USG, LFT attached" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
     ],
   },
   {
@@ -143,16 +153,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA003"] * 60000).toISOString(),
     aiReadinessScore: 45,
     missingCritical: ["Implant cost breakup", "Doctor's recommendation with stamp", "Pre-operative X-ray/MRI"],
-    complianceStatus: "non_compliant",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "missing", aiSuggestion: "Ensure hospital stamp and registration number on recommendation." },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "partial", value: "Total only; implant breakup missing", aiSuggestion: "IRDAI requires separate implant cost. Request itemized quote." },
-      { id: "c4", label: "Consent form", status: "pending" },
-      { id: "c5", label: "Pre-operative X-ray/MRI", status: "missing", aiSuggestion: "Radiological evidence required for joint replacement pre-auth." },
-      { id: "c6", label: "Policy copy", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof", status: "complete", value: "Verified" },
-      { id: "c8", label: "Waiting period / pre-existing", status: "pending" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "missing" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "Total only; implant breakup missing" },
+      { id: "c4", label: "Consent form", status: "submitted", value: "Attached but blurred" },
+      { id: "c5", label: "Pre-operative X-ray/MRI", status: "missing" },
+      { id: "c6", label: "Policy copy", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period / pre-existing", status: "submitted" },
     ],
   },
   {
@@ -171,16 +180,9 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA004"] * 60000).toISOString(),
     aiReadinessScore: 0,
     missingCritical: [],
-    complianceStatus: "pending_review",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
-      { id: "c2", label: "Doctor's recommendation with stamp", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
-      { id: "c4", label: "Consent form with patient signature", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
-      { id: "c5", label: "Pre-operative investigation reports", irdaiRef: "IRDAI Circular 12/2016", status: "pending" },
       { id: "c6", label: "Policy copy / e-card", status: "pending" },
       { id: "c7", label: "ID proof (Aadhaar/Passport)", status: "pending" },
-      { id: "c8", label: "Waiting period compliance check", irdaiRef: "Policy terms", status: "pending" },
     ],
   },
   {
@@ -190,25 +192,23 @@ export const preAuthRequests: PreAuthRequest[] = [
     policyHolderId: "P007",
     insurerId: "I005",
     assigneeId: "A001",
-    status: "under_review",
+    status: "approved",
     estimatedAmount: 320000,
     procedure: "Endoscopic Sinus Surgery",
     diagnosis: "Chronic Rhinosinusitis with Nasal Polyps",
     icdCode: "J33.9",
     submittedAt: "2025-02-02T08:15:00Z",
     slaDeadline: new Date(now.getTime() + durations["PA005"] * 60000).toISOString(),
-    aiReadinessScore: 88,
+    aiReadinessScore: 94,
     missingCritical: [],
-    complianceStatus: "compliant",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹3,20,000" },
-      { id: "c4", label: "Consent form with patient signature", status: "complete", value: "Received" },
-      { id: "c5", label: "Pre-operative investigation reports", status: "complete", value: "CT PNS, CBC attached" },
-      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof", status: "complete", value: "Verified" },
-      { id: "c8", label: "Waiting period compliance", status: "complete", value: "Compliant" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹3,20,000" },
+      { id: "c4", label: "Consent form with patient signature", status: "submitted", value: "Received" },
+      { id: "c5", label: "Pre-operative investigation reports", status: "submitted", value: "CT PNS, CBC attached" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
     ],
   },
   {
@@ -227,16 +227,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA006"] * 60000).toISOString(),
     aiReadinessScore: 58,
     missingCritical: ["PSA report", "Uroflowmetry study"],
-    complianceStatus: "partial",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹1,50,000" },
-      { id: "c4", label: "Consent form with patient signature", status: "complete", value: "Received" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹1,50,000" },
+      { id: "c4", label: "Consent form with patient signature", status: "submitted", value: "Received" },
       { id: "c5", label: "PSA report (last 3 months)", status: "missing", aiSuggestion: "Request PSA report to rule out malignancy." },
       { id: "c6", label: "Uroflowmetry / PVR report", status: "missing", aiSuggestion: "Attach uroflowmetry and PVR for BPH severity." },
-      { id: "c7", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c8", label: "ID proof", status: "complete", value: "Verified" },
+      { id: "c7", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c8", label: "ID proof", status: "submitted", value: "Verified" },
     ],
   },
   {
@@ -254,16 +253,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA007"] * 60000).toISOString(),
     aiReadinessScore: 72,
     missingCritical: ["Histopathology report", "Oncology board notes"],
-    complianceStatus: "partial",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹6,20,000" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹6,20,000" },
       { id: "c4", label: "Histopathology report", status: "missing", aiSuggestion: "Attach biopsy-confirmed histopathology report." },
       { id: "c5", label: "Oncology board notes / treatment plan", status: "missing", aiSuggestion: "Provide MDT board notes for treatment plan." },
-      { id: "c6", label: "Consent form", status: "complete", value: "Received" },
-      { id: "c7", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c8", label: "ID proof", status: "complete", value: "Verified" },
+      { id: "c6", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c7", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c8", label: "ID proof", status: "submitted", value: "Verified" },
     ],
   },
   {
@@ -282,16 +280,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA008"] * 60000).toISOString(),
     aiReadinessScore: 95,
     missingCritical: [],
-    complianceStatus: "compliant",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹98,000" },
-      { id: "c4", label: "Consent form with patient signature", status: "complete", value: "Received" },
-      { id: "c5", label: "Pre-operative investigation reports", status: "complete", value: "USG KUB, RFT attached" },
-      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof", status: "complete", value: "Verified" },
-      { id: "c8", label: "Waiting period compliance", status: "complete", value: "Compliant" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹98,000" },
+      { id: "c4", label: "Consent form with patient signature", status: "submitted", value: "Received" },
+      { id: "c5", label: "Pre-operative investigation reports", status: "submitted", value: "USG KUB, RFT attached" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
     ],
   },
   {
@@ -310,16 +307,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA009"] * 60000).toISOString(),
     aiReadinessScore: 62,
     missingCritical: ["2D Echo report", "Coronary angiography CD"],
-    complianceStatus: "partial",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹4,10,000" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹4,10,000" },
       { id: "c4", label: "2D Echo report", status: "missing", aiSuggestion: "Attach 2D Echo with EF and valve assessment." },
       { id: "c5", label: "Coronary angiography CD/report", status: "missing", aiSuggestion: "Provide angiography CD/report for CABG indication." },
-      { id: "c6", label: "Consent form with patient signature", status: "complete", value: "Received" },
-      { id: "c7", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c8", label: "ID proof", status: "complete", value: "Verified" },
+      { id: "c6", label: "Consent form with patient signature", status: "submitted", value: "Received" },
+      { id: "c7", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c8", label: "ID proof", status: "submitted", value: "Verified" },
     ],
   },
   {
@@ -338,16 +334,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA010"] * 60000).toISOString(),
     aiReadinessScore: 98,
     missingCritical: [],
-    complianceStatus: "compliant",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "complete", value: "₹86,000" },
-      { id: "c4", label: "Consent form with patient signature", status: "complete", value: "Received" },
-      { id: "c5", label: "Pre-operative MRI report", status: "complete", value: "MRI knee attached" },
-      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof", status: "complete", value: "Verified" },
-      { id: "c8", label: "Waiting period compliance", status: "complete", value: "Compliant" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹86,000" },
+      { id: "c4", label: "Consent form with patient signature", status: "submitted", value: "Received" },
+      { id: "c5", label: "Pre-operative MRI report", status: "submitted", value: "MRI knee attached" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
     ],
   },
   {
@@ -366,16 +361,15 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA011"] * 60000).toISOString(),
     aiReadinessScore: 40,
     missingCritical: ["BMI assessment report", "6-month supervised weight loss documentation"],
-    complianceStatus: "non_compliant",
     checklist: [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", status: "complete", value: "Attached" },
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
       { id: "c3", label: "BMI assessment report", status: "missing", aiSuggestion: "Provide BMI calculation and obesity classification." },
       { id: "c4", label: "6-month supervised weight loss documentation", status: "missing", aiSuggestion: "Attach supervised weight loss program records." },
-      { id: "c5", label: "Psychological evaluation report", status: "invalid", aiSuggestion: "Updated eval required within last 3 months." },
-      { id: "c6", label: "Consent form", status: "complete", value: "Received" },
-      { id: "c7", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c8", label: "ID proof", status: "complete", value: "Verified" },
+      { id: "c5", label: "Psychological evaluation report", status: "submitted", aiSuggestion: "Updated eval required within last 3 months." },
+      { id: "c6", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c7", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c8", label: "ID proof", status: "submitted", value: "Verified" },
     ],
   },
   {
@@ -393,7 +387,6 @@ export const preAuthRequests: PreAuthRequest[] = [
     slaDeadline: new Date(now.getTime() + durations["PA012"] * 60000).toISOString(),
     aiReadinessScore: 10,
     missingCritical: ["Signed pre-auth form", "Doctor's recommendation"],
-    complianceStatus: "pending_review",
     checklist: [
       { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "pending" },
       { id: "c2", label: "Doctor's recommendation with stamp", status: "pending" },
@@ -405,14 +398,221 @@ export const preAuthRequests: PreAuthRequest[] = [
       { id: "c8", label: "Waiting period compliance check", status: "pending" },
     ],
   },
+  {
+    id: "PA013",
+    claimId: "CLM/2025/013/ICICI",
+    hospitalId: "H002",
+    policyHolderId: "P015",
+    insurerId: "I003",
+    assigneeId: "A003",
+    status: "under_review",
+    estimatedAmount: 315000,
+    procedure: "Total Abdominal Hysterectomy",
+    diagnosis: "Multiple Uterine Fibroids",
+    icdCode: "D25.9",
+    submittedAt: "2025-02-04T10:15:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA013"] * 60000).toISOString(),
+    aiReadinessScore: 85,
+    missingCritical: [],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹3,15,000" },
+      { id: "c4", label: "USG Abdomen/Pelvis report", status: "submitted", value: "Attached" },
+      { id: "c5", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
+    ],
+  },
+  {
+    id: "PA014",
+    claimId: "CLM/2025/014/NIVA",
+    hospitalId: "H005",
+    policyHolderId: "P016",
+    insurerId: "I005",
+    assigneeId: "A001",
+    status: "submitted",
+    estimatedAmount: 120000,
+    procedure: "ORIF (Open Reduction Internal Fixation)",
+    diagnosis: "Fracture Shaft of Femur",
+    icdCode: "S72.30",
+    submittedAt: "2025-02-04T11:45:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA014"] * 60000).toISOString(),
+    aiReadinessScore: 78,
+    missingCritical: ["X-ray report of Femur"],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Estimated cost breakdown (itemized)", status: "submitted", value: "₹1,20,000" },
+      { id: "c4", label: "X-ray report of Femur", status: "missing", aiSuggestion: "X-ray confirming fracture location and type is essential for ORIF." },
+      { id: "c5", label: "Trauma notes / ER summary", status: "submitted", value: "Attached" },
+      { id: "c6", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Accidental case; waiver applies" },
+    ],
+  },
+  {
+    id: "PA015",
+    claimId: "CLM/2025/015/CARE",
+    hospitalId: "H004",
+    policyHolderId: "P017",
+    insurerId: "I004",
+    assigneeId: "A002",
+    status: "awaiting_docs",
+    estimatedAmount: 65000,
+    procedure: "Chemotherapy (Injection Pemetrexed + Carboplatin)",
+    diagnosis: "Adenocarcinoma Lung, Stage IV",
+    icdCode: "C34.9",
+    submittedAt: "2025-02-04T13:20:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA015"] * 60000).toISOString(),
+    aiReadinessScore: 45,
+    missingCritical: ["Histopathology report", "Staging PET scan"],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "Histopathology report", status: "missing", aiSuggestion: "Biopsy confirmation is required for oncology cases." },
+      { id: "c4", label: "Staging PET scan", status: "missing", aiSuggestion: "PET scan required to confirm Stage IV status." },
+      { id: "c5", label: "Drug invoice / Quote", status: "submitted", value: "Pemetrexed quote missing", aiSuggestion: "Provide itemized cost of chemotherapy drugs." },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
+    ],
+  },
+  {
+    id: "PA016",
+    claimId: "CLM/2025/016/STAR",
+    hospitalId: "H001",
+    policyHolderId: "P018",
+    insurerId: "I001",
+    assigneeId: "A003",
+    status: "under_review",
+    estimatedAmount: 750000,
+    procedure: "Valve Replacement Surgery",
+    diagnosis: "Severe Aortic Stenosis",
+    icdCode: "I35.0",
+    submittedAt: "2025-02-04T15:10:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA016"] * 60000).toISOString(),
+    aiReadinessScore: 92,
+    missingCritical: [],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation with stamp", status: "submitted", value: "Attached" },
+      { id: "c3", label: "2D Echo report", status: "submitted", value: "AVA < 1 cm2" },
+      { id: "c4", label: "Estimated cost breakdown", status: "submitted", value: "₹7,50,000" },
+      { id: "c5", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c6", label: "Policy copy / e-card", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
+    ],
+  },
+  {
+    id: "PA017",
+    claimId: "CLM/2025/017/HDFC",
+    hospitalId: "H003",
+    policyHolderId: "P019",
+    insurerId: "I002",
+    status: "submitted",
+    estimatedAmount: 42000,
+    procedure: "Dengue Fever Management (Inpatient)",
+    diagnosis: "Dengue with Thrombocytopenia",
+    icdCode: "A91",
+    submittedAt: "2025-02-04T16:30:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA017"] * 60000).toISOString(),
+    aiReadinessScore: 35,
+    missingCritical: ["NS1/IgM Positive report", "Serial platelet counts"],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation", status: "submitted", value: "Attached" },
+      { id: "c3", label: "NS1 Antigen / IgM Antibody report", status: "missing", aiSuggestion: "Lab confirmation of Dengue is required for approval." },
+      { id: "c4", label: "Serial Platelet counts", status: "missing", aiSuggestion: "Provide CBC reports showing platelet trend." },
+      { id: "c5", label: "Temperature charts", status: "pending" },
+      { id: "c6", label: "Policy copy", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Admission summary", status: "submitted", value: "Emergency admission" },
+    ],
+  },
+  {
+    id: "PA018",
+    claimId: "CLM/2025/018/ICICI",
+    hospitalId: "H006",
+    policyHolderId: "P020",
+    insurerId: "I003",
+    status: "draft",
+    estimatedAmount: 185000,
+    procedure: "Laparoscopic Hernia Repair (IPOM)",
+    diagnosis: "Ventral Hernia",
+    icdCode: "K43.9",
+    submittedAt: "2025-02-04T17:20:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA018"] * 60000).toISOString(),
+    aiReadinessScore: 10,
+    missingCritical: ["Signed pre-auth form", "Clinical photos"],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "pending" },
+      { id: "c2", label: "Doctor's recommendation", status: "pending" },
+      { id: "c3", label: "Mesh and Tackers cost breakup", status: "pending" },
+      { id: "c4", label: "Clinical photos of hernia", status: "missing", aiSuggestion: "Clinical photo required for ventral hernia justification." },
+      { id: "c5", label: "USG Abdomen report", status: "pending" },
+      { id: "c6", label: "Policy copy", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "pending" },
+    ],
+  },
+  {
+    id: "PA019",
+    claimId: "CLM/2025/019/NIVA",
+    hospitalId: "H002",
+    policyHolderId: "P005",
+    insurerId: "I005",
+    status: "approved",
+    estimatedAmount: 55000,
+    procedure: "AV Fistula Creation",
+    diagnosis: "Chronic Kidney Disease Stage V",
+    icdCode: "N18.5",
+    submittedAt: "2025-02-01T09:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA019"] * 60000).toISOString(),
+    aiReadinessScore: 95,
+    missingCritical: [],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation", status: "submitted", value: "Attached" },
+      { id: "c3", label: "RFT / GFR report", status: "submitted", value: "Creatinine 8.2" },
+      { id: "c4", label: "Nephrologist prescription", status: "submitted", value: "Attached" },
+      { id: "c5", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c6", label: "Policy copy", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Waiting period compliance", status: "submitted", value: "Compliant" },
+    ],
+  },
+  {
+    id: "PA020",
+    claimId: "CLM/2025/020/CARE",
+    hospitalId: "H003",
+    policyHolderId: "P009",
+    insurerId: "I004",
+    status: "rejected",
+    estimatedAmount: 125000,
+    procedure: "Root Canal Treatment with Crown",
+    diagnosis: "Dental Caries",
+    icdCode: "K02.9",
+    submittedAt: "2025-02-02T14:00:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA020"] * 60000).toISOString(),
+    aiReadinessScore: 50,
+    missingCritical: ["OPD Treatment justification"],
+    checklist: [
+      { id: "c1", label: "Pre-auth form (Form A) duly filled", status: "submitted", value: "Uploaded" },
+      { id: "c2", label: "Doctor's recommendation", status: "submitted", value: "Attached" },
+      { id: "c3", label: "X-ray OPG", status: "submitted", value: "Attached" },
+      { id: "c4", label: "Service inclusion check", status: "submitted", aiSuggestion: "Dental procedures are typically excluded unless due to accident." },
+      { id: "c5", label: "Consent form", status: "submitted", value: "Received" },
+      { id: "c6", label: "Policy copy", status: "submitted", value: "Verified" },
+      { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
+      { id: "c8", label: "Exclusion policy verify", status: "submitted", value: "Dental exclusion clause G.4.2 active" },
+    ],
+  },
 ];
 
 export const claims: Claim[] = [
-  { id: "CLM001", claimNumber: "CLM/2025/001/STAR", preAuthId: "PA001", hospitalId: "H001", policyHolderId: "P001", insurerId: "I001", status: "pending_preauth", claimedAmount: 0, procedure: "Coronary Angioplasty", admissionDate: "2025-01-28", dischargeDate: "", submittedAt: "2025-01-28T09:30:00Z", complianceFlags: ["Pre-auth pending docs"] },
-  { id: "CLM002", claimNumber: "CLM/2025/002/HDFC", preAuthId: "PA002", hospitalId: "H002", policyHolderId: "P002", insurerId: "I002", status: "under_review", claimedAmount: 0, procedure: "Laparoscopic Cholecystectomy", admissionDate: "2025-01-29", dischargeDate: "", submittedAt: "2025-01-29T11:00:00Z", complianceFlags: [] },
-  { id: "CLM003", claimNumber: "CLM/2025/003/ICICI", preAuthId: "PA003", hospitalId: "H003", policyHolderId: "P003", insurerId: "I003", status: "pending_preauth", claimedAmount: 0, procedure: "Total Knee Replacement", admissionDate: "2025-01-30", dischargeDate: "", submittedAt: "2025-01-30T14:20:00Z", complianceFlags: ["Incomplete documentation"] },
-  { id: "CLM004", claimNumber: "CLM/2025/004/CARE", hospitalId: "H004", policyHolderId: "P004", insurerId: "I004", status: "under_review", claimedAmount: 125000, approvedAmount: 118000, procedure: "Appendectomy", admissionDate: "2025-01-25", dischargeDate: "2025-01-27", submittedAt: "2025-01-27T16:00:00Z", complianceFlags: [] },
-  { id: "CLM005", claimNumber: "CLM/2025/005/STAR", hospitalId: "H001", policyHolderId: "P006", insurerId: "I001", status: "under_review", claimedAmount: 45000, approvedAmount: undefined, procedure: "Dengue Management", admissionDate: "2025-01-20", dischargeDate: "2025-01-24", submittedAt: "2025-01-24T10:00:00Z", complianceFlags: [] },
 ];
 
 export const fraudAlerts: FraudAlert[] = [
@@ -458,14 +658,29 @@ export const fraudAlerts: FraudAlert[] = [
     detectedAt: "2025-01-31T09:00:00Z",
     status: "open",
   },
+  {
+    id: "FRAUD004",
+    type: "policy_misuse",
+    severity: "high",
+    claimIds: ["CLM/2025/011/HDFC"],
+    description: "Frequent claimant anomaly: 4 bariatric-related claims in 18 months across 3 different TPAs. Suspected systemic misuse of policy terms for elective surgery.",
+    aiConfidence: 91,
+    detectedAt: "2025-02-01T11:20:00Z",
+    status: "open",
+  },
+  {
+    id: "FRAUD005",
+    type: "phantom_billing",
+    severity: "medium",
+    claimIds: ["CLM/2025/007/STAR"],
+    description: "Geographical anomaly detected: Patient address is 800km from hospital. No referral records found. Supporting documents show stock images for lab reports.",
+    aiConfidence: 78,
+    detectedAt: "2025-02-03T10:05:00Z",
+    status: "under_investigation",
+  },
 ];
 
-export const complianceRules: ComplianceRule[] = [
-  { id: "CR1", name: "Pre-auth timeline (48 hrs)", irdaiRef: "IRDAI Circular 12/2016", description: "TPA must respond to pre-auth within 48 hours of complete documents.", category: "preauth", status: "compliant", lastChecked: "2025-01-31" },
-  { id: "CR2", name: "Cashless approval documentation", irdaiRef: "IRDAI Circular 12/2016", description: "All mandatory documents as per checklist must be obtained before approval.", category: "documentation", status: "compliant", lastChecked: "2025-01-31" },
-  { id: "CR3", name: "Claim settlement timeline", irdaiRef: "IRDAI Circular 21/2019", description: "Reimbursement claims to be settled within 30 days of document receipt.", category: "claims", status: "compliant", lastChecked: "2025-01-28" },
-  { id: "CR4", name: "Hospital empanelment validity", irdaiRef: "Insurer TPA agreement", description: "Only empanelled hospitals for cashless. Verify active empanelment.", category: "preauth", status: "compliant", lastChecked: "2025-01-31" },
-];
+
 
 export function getHospital(id: string): Hospital | undefined {
   return hospitals.find((h) => h.id === id);
@@ -505,26 +720,78 @@ export function formatPreAuthKey(id: string): string {
   return `PA/2025/${num.padStart(3, "0")}`;
 }
 
-/** Simulated AI analysis result for demo flow (step-by-step checklist run). Used when checklist is pending. */
+/** Simulated AI analysis result for demo flow. Returns the checklist with AI-enhanced statuses. */
 export function getSimulatedAnalysisResult(paId: string): PreAuthCheckItem[] | null {
   const pa = getPreAuth(paId);
   if (!pa) return null;
-  const allPending = pa.checklist.every((c) => c.status === "pending");
-  if (!allPending) return null; // already analysed, use existing checklist
-  // PA004 demo: simulate result (mix of complete and missing, like PA001)
-  if (paId === "PA004") {
-    return [
-      { id: "c1", label: "Pre-auth form (Form A) duly filled", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Uploaded" },
-      { id: "c2", label: "Doctor's recommendation with stamp", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "Attached" },
-      { id: "c3", label: "Estimated cost breakdown (itemized)", irdaiRef: "IRDAI Circular 12/2016", status: "complete", value: "₹1,95,000" },
-      { id: "c4", label: "Consent form with patient signature", irdaiRef: "IRDAI Circular 12/2016", status: "missing", aiSuggestion: "Request signed consent from hospital. Template available per IRDAI guidelines." },
-      { id: "c5", label: "Pre-operative investigation reports", irdaiRef: "IRDAI Circular 12/2016", status: "missing", aiSuggestion: "Slit-lamp, A-scan required for cataract pre-auth." },
-      { id: "c6", label: "Policy copy / e-card", status: "complete", value: "Verified" },
-      { id: "c7", label: "ID proof (Aadhaar/Passport)", status: "complete", value: "Aadhaar linked" },
-      { id: "c8", label: "Waiting period compliance check", irdaiRef: "Policy terms", status: "complete", value: "Compliant" },
-    ];
-  }
-  return null;
+
+  // Clone checklist to avoid mutating original
+  const result: PreAuthCheckItem[] = JSON.parse(JSON.stringify(pa.checklist));
+
+  result.forEach(item => {
+    if (item.status === "submitted") {
+      // Logic for diverse permutations per PA case
+      if (paId === "PA001") {
+        if (item.id === "c2") {
+          item.status = "inconsistent";
+          item.aiSuggestion = "Hospital seal appears to be digitally added, not stamped.";
+        } else if (item.id === "c3") {
+          item.status = "incomplete";
+          item.aiSuggestion = "Pharmacy cost breakdown is missing details.";
+        } else {
+          item.status = "approved";
+        }
+      } else if (paId === "PA002") {
+        if (item.id === "c6") {
+          item.status = "inconsistent";
+          item.aiSuggestion = "Patient's photo is not clearly visible.";
+        } else {
+          item.status = "approved";
+        }
+      } else if (paId === "PA003") {
+        if (item.id === "c3") {
+          item.status = "incomplete";
+          item.aiSuggestion = "Separate bill for Implant Serial Number is missing.";
+        } else if (item.id === "c4") {
+          item.status = "inconsistent";
+          item.aiSuggestion = "Signature on consent form does not match our records.";
+        } else if (item.id === "c1") {
+          item.status = "incomplete";
+          item.aiSuggestion = "Hospital PIN code is missing in the form.";
+        } else {
+          item.status = "approved";
+        }
+      } else if (paId === "PA004") {
+        if (item.id === "c7") {
+          item.status = "incomplete";
+          item.aiSuggestion = "ID card number in document does not match policy records.";
+        } else {
+          item.status = "approved";
+        }
+      } else if (paId === "PA005") {
+        if (item.id === "c2") {
+          item.status = "inconsistent";
+          item.aiSuggestion = "Surgeon is not registered for Robotic-Assisted procedures.";
+        } else {
+          item.status = "approved";
+        }
+      } else {
+        // Fallback: 50% chance of approved if submitted, to ensure we see failures
+        const rand = Math.random();
+        if (rand > 0.5) {
+          item.status = "approved";
+        } else if (rand > 0.25) {
+          item.status = "inconsistent";
+          item.aiSuggestion = `Patient ID in ${item.label} matches a different policy record.`;
+        } else {
+          item.status = "incomplete";
+          item.aiSuggestion = `Mandatory field '${item.label}' is unreadable or blank.`;
+        }
+      }
+    }
+  });
+
+  return result;
 }
 
 // ==========================================

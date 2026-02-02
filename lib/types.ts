@@ -1,4 +1,4 @@
-// TPA Copilot - Types for claims, pre-auth, fraud, compliance
+// TPA Copilot - Types for claims, pre-auth, fraud
 
 export type ClaimStatus = "pending_preauth" | "preauth_approved" | "preauth_rejected" | "under_review" | "approved" | "rejected" | "paid";
 
@@ -40,10 +40,10 @@ export interface TPAAssignee {
 export interface PreAuthCheckItem {
   id: string;
   label: string;
-  irdaiRef?: string;
-  status: "complete" | "missing" | "invalid" | "pending" | "partial";
+  status: "submitted" | "missing" | "approved" | "inconsistent" | "incomplete" | "pending";
   aiSuggestion?: string;
   value?: string;
+  irdaiRef?: string;
 }
 
 export interface PreAuthRequest {
@@ -63,7 +63,6 @@ export interface PreAuthRequest {
   checklist: PreAuthCheckItem[];
   aiReadinessScore: number; // 0-100
   missingCritical: string[];
-  complianceStatus: ComplianceStatus;
 }
 
 export interface Claim {
@@ -80,7 +79,6 @@ export interface Claim {
   admissionDate: string;
   dischargeDate: string;
   submittedAt: string;
-  complianceFlags: string[];
 }
 
 export interface FraudAlert {
@@ -100,19 +98,9 @@ export interface FraudAlert {
   };
 }
 
-export interface ComplianceRule {
-  id: string;
-  name: string;
-  irdaiRef: string;
-  description: string;
-  category: "preauth" | "claims" | "documentation" | "timelines";
-  status: ComplianceStatus;
-  lastChecked: string;
-}
 
 // Pre-auth workflow (7 stages) - demo data types
 export type WorkflowStageId =
-  | "request_initiation"
   | "documentation"
   | "eligibility"
   | "medical_coding"

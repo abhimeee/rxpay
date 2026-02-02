@@ -11,321 +11,7 @@ type Phase = "idle" | "running" | "summary";
 
 const MISSING_STATUSES = new Set(["missing", "invalid", "pending", "partial"]);
 
-const padPdfOffset = (offset: number) => String(offset).padStart(10, "0");
 
-const escapePdfText = (value: string) =>
-  value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-
-const encodeBase64 = (value: string) => {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
-  }
-  return btoa(binary);
-};
-
-const buildDummyPdfDataUri = (lines: string[]) => {
-  const safeLines = lines.map((line) => escapePdfText(line || " "));
-  const contentParts: string[] = [];
-  if (safeLines.length > 0) {
-    contentParts.push("BT", "/F1 18 Tf", "72 740 Td", `(${safeLines[0]}) Tj`);
-  } else {
-    contentParts.push("BT", "/F1 18 Tf", "72 740 Td", "(Document) Tj");
-  }
-  if (safeLines.length > 1) {
-    contentParts.push("/F1 12 Tf", "0 -22 Td", `(${safeLines[1]}) Tj`);
-  }
-  contentParts.push("/F1 10 Tf");
-  for (let i = safeLines.length > 1 ? 2 : 1; i < safeLines.length; i += 1) {
-    contentParts.push("0 -14 Td", `(${safeLines[i]}) Tj`);
-  }
-  contentParts.push("ET");
-  const content = contentParts.join("\n");
-  const objects = [
-    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
-    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
-    `4 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`,
-    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-  ];
-  let offset = "%PDF-1.4\n".length;
-  const offsets = objects.map((obj) => {
-    const current = offset;
-    offset += obj.length;
-    return current;
-  });
-  const xrefOffset = offset;
-  const xref = [
-    "xref",
-    `0 ${objects.length + 1}`,
-    "0000000000 65535 f ",
-    ...offsets.map((o) => `${padPdfOffset(o)} 00000 n `),
-    "trailer",
-    `<< /Size ${objects.length + 1} /Root 1 0 R >>`,
-    "startxref",
-    String(xrefOffset),
-    "%%EOF",
-  ].join("\n");
-  const pdf = `%PDF-1.4\n${objects.join("")}${xref}`;
-  return `data:application/pdf;base64,${encodeBase64(pdf)}`;
-};
-
-type DocumentContext = {
-  preAuthKey?: string;
-  claimId?: string;
-  patientName?: string;
-  policyNumber?: string;
-  insurerName?: string;
-  hospitalName?: string;
-  procedure?: string;
-  diagnosis?: string;
-  icdCode?: string;
-  estimatedAmount?: number;
-  sumInsured?: number;
-  submittedAt?: string;
-};
-
-const buildCostBreakdown = (amount?: number) => {
-  if (!amount) {
-    return ["Total estimate not provided.", "Breakup to follow per hospital rate card."];
-  }
-  const parts = [
-    { label: "Room and nursing (3 days)", pct: 0.18 },
-    { label: "Surgeon and assistant fees", pct: 0.22 },
-    { label: "Anesthesia and consumables", pct: 0.08 },
-    { label: "OT and equipment charges", pct: 0.14 },
-    { label: "Implant / device", pct: 0.28 },
-    { label: "Pharmacy and disposables", pct: 0.06 },
-  ];
-  const computed = parts.map((part) => ({
-    label: part.label,
-    value: Math.round(amount * part.pct),
-  }));
-  const totalSoFar = computed.reduce((sum, item) => sum + item.value, 0);
-  const remainder = Math.max(amount - totalSoFar, 0);
-  const withRemainder = [
-    ...computed,
-    { label: "Diagnostics and labs", value: remainder || Math.round(amount * 0.04) },
-  ];
-  return withRemainder.map((item) => `${item.label}: ${formatCurrency(item.value)}`);
-};
-
-const buildDocumentDetails = (label: string, context: DocumentContext) => {
-  const lowerLabel = label.toLowerCase();
-  if (lowerLabel.includes("pre-auth form") || lowerLabel.includes("form a")) {
-    return [
-      "Form ID: PA-FORM-A/2025/001",
-      "Requested by: Hospital TPA desk",
-      `Procedure requested: ${context.procedure ?? "As per clinical notes"}`,
-      `Provisional diagnosis: ${context.diagnosis ?? "As per treating physician"}`,
-      "Room category: Semi-private",
-      "Expected length of stay: 3 days",
-      "Treating doctor: Dr. A. Sharma (Reg. 23145)",
-      "Attachments: clinical notes, investigation summary",
-    ];
-  }
-  if (lowerLabel.includes("doctor") && lowerLabel.includes("recommendation")) {
-    return [
-      "Letterhead: Attending physician recommendation",
-      "Physician: Dr. A. Sharma, Medicine",
-      "Reg No: MCI/CH/43210",
-      `Clinical summary: ${context.diagnosis ?? "Patient condition as per notes"}`,
-      `Recommended procedure: ${context.procedure ?? "As per plan"}`,
-      "Rationale: Standard of care; conservative care ineffective.",
-      "Signed and stamped on 2025-02-01",
-    ];
-  }
-  if (lowerLabel.includes("cost breakdown") || lowerLabel.includes("itemized")) {
-    return [
-      "Rate card category: Network hospital cashless",
-      ...buildCostBreakdown(context.estimatedAmount),
-      `Total estimate: ${context.estimatedAmount ? formatCurrency(context.estimatedAmount) : "Pending"}`,
-      "Taxes/consumables included as per tariff.",
-    ];
-  }
-  if (lowerLabel.includes("consent")) {
-    return [
-      `Patient/attendant: ${context.patientName ?? "On file"}`,
-      "Consent type: Procedure + anesthesia",
-      "Risks explained: bleeding, infection, anesthesia reactions",
-      "Alternatives discussed: medical management, deferment",
-      "Witness: Hospital staff on duty",
-      "Signed consent stored in hospital records.",
-    ];
-  }
-  if (
-    lowerLabel.includes("investigation") ||
-    lowerLabel.includes("x-ray") ||
-    lowerLabel.includes("mri")
-  ) {
-    return [
-      "Attached reports:",
-      "CBC, ESR, CRP",
-      "ECG / ECHO summary",
-      "Imaging: X-ray / USG / MRI as applicable",
-      "Key findings: within acceptable range for procedure",
-      "Sample date: 2025-01-28",
-    ];
-  }
-  if (lowerLabel.includes("policy") || lowerLabel.includes("e-card")) {
-    return [
-      `Insurer: ${context.insurerName ?? "On file"}`,
-      `Policy number: ${context.policyNumber ?? "Pending"}`,
-      `Sum insured: ${context.sumInsured ? formatCurrency(context.sumInsured) : "As per policy"}`,
-      "TPA: BioPass TPA Services",
-      "Network: Cashless enabled at hospital",
-      "Validity: 01-Apr-2024 to 31-Mar-2025",
-    ];
-  }
-  if (lowerLabel.includes("id proof")) {
-    return [
-      "ID type: Aadhaar / Passport / DL",
-      "Masked ID: XXXX-XXXX-4521",
-      "Issued by: UIDAI",
-      "Verification: eKYC matched with policy holder",
-      "Date verified: 2025-01-28",
-    ];
-  }
-  if (lowerLabel.includes("waiting period")) {
-    return [
-      "Policy inception: 2023-04-01",
-      "Waiting period: 24 months for pre-existing",
-      "Coverage effective: 2025-04-01",
-      "No waiting period breach detected",
-    ];
-  }
-  return [
-    "Document reviewed by TPA desk.",
-    "Metadata and signatures verified.",
-    "Uploaded via hospital cashless portal.",
-    "Notes: Refer to attached clinical summary.",
-  ];
-};
-
-const buildDocumentLines = (item: PreAuthCheckItem, context: DocumentContext) => {
-  const reference = item.irdaiRef ?? "IRDAI documentation checklist";
-  const statusLabel =
-    item.status === "complete"
-      ? "Complete"
-      : item.status === "missing"
-        ? "Missing"
-        : item.status === "invalid"
-          ? "Invalid"
-          : item.status === "partial"
-            ? "Partial"
-            : "Pending";
-  const diagnosisLine = context.diagnosis
-    ? `${context.diagnosis}${context.icdCode ? ` (ICD ${context.icdCode})` : ""}`
-    : "N/A";
-  const caseDetails = [
-    `Claim ID: ${context.claimId ?? "N/A"}`,
-    `Pre-Auth: ${context.preAuthKey ?? "N/A"}`,
-    `Patient: ${context.patientName ?? "N/A"}`,
-    `Policy: ${context.policyNumber ?? "N/A"}`,
-    `Hospital: ${context.hospitalName ?? "N/A"}`,
-    `Procedure: ${context.procedure ?? "N/A"}`,
-    `Diagnosis: ${diagnosisLine}`,
-    `Estimated amount: ${context.estimatedAmount ? formatCurrency(context.estimatedAmount) : "N/A"}`,
-  ];
-  if (context.submittedAt) {
-    caseDetails.push(`Submitted: ${context.submittedAt}`);
-  }
-  return [
-    item.label,
-    `Status: ${statusLabel}`,
-    `Reference: ${reference}`,
-    `Provided value: ${item.value ?? "Pending"}`,
-    "",
-    "Case Details",
-    ...caseDetails,
-    "",
-    "Document Details",
-    ...buildDocumentDetails(item.label, context),
-    "",
-    "Generated for demo preview only.",
-  ];
-};
-
-const DocumentDropdown = ({ item, context }: { item: PreAuthCheckItem; context: DocumentContext }) => {
-  const isMissing = MISSING_STATUSES.has(item.status);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const reference = item.irdaiRef ?? "IRDAI documentation checklist";
-  const pdfUri = useMemo(
-    () => buildDummyPdfDataUri(buildDocumentLines(item, context)),
-    [item, context]
-  );
-
-  return (
-    <details className="mt-2 rounded-lg border border-slate-200 bg-slate-50">
-      <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-slate-700 flex items-center justify-between">
-        <span>Document preview</span>
-        <span className="text-xs text-slate-500">PDF</span>
-      </summary>
-      <div className="px-3 pb-3">
-        {isMissing && (
-          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2">
-            Missing item cited: {reference}
-          </p>
-        )}
-        {item.aiSuggestion && isMissing && (
-          <p className="text-xs text-slate-600 mb-2">{item.aiSuggestion}</p>
-        )}
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs text-slate-500">Preview (PDF)</p>
-          <button
-            type="button"
-            onClick={() => setIsFullScreen(true)}
-            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3" />
-            </svg>
-            Enlarge
-          </button>
-        </div>
-        <div className="rounded-md border border-slate-200 overflow-hidden bg-white">
-          <iframe
-            title={`${item.label} preview`}
-            src={pdfUri}
-            className="w-full h-56"
-          />
-        </div>
-        {isFullScreen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-6"
-            onClick={() => setIsFullScreen(false)}
-          >
-            <div
-              className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-                <p className="text-sm font-medium text-slate-700">{item.label}</p>
-                <button
-                  type="button"
-                  onClick={() => setIsFullScreen(false)}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Close
-                </button>
-              </div>
-              <iframe
-                title={`${item.label} full view`}
-                src={pdfUri}
-                className="h-full w-full"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </details>
-  );
-};
 
 interface AnalysisFlowProps {
   checklist: PreAuthCheckItem[];
@@ -343,6 +29,7 @@ interface AnalysisFlowProps {
   icdCode?: string;
   sumInsured?: number;
   submittedAt?: string;
+  onViewDoc?: (item: PreAuthCheckItem) => void;
 }
 
 export function AnalysisFlow({
@@ -361,54 +48,27 @@ export function AnalysisFlow({
   icdCode,
   sumInsured,
   submittedAt,
+  onViewDoc,
 }: AnalysisFlowProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [step, setStep] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const items = analysisResult ?? checklist;
+
+  // Use checklist for idle, analysisResult for summary/running
+  const items = (phase === "idle") ? checklist : (analysisResult ?? checklist);
   const totalSteps = items.length;
 
-  const currentItem = items[step];
-  const isChecking = phase === "running" && !revealed;
-  const isRevealed = phase === "running" && revealed;
+  const submittedCount = checklist.filter((c) => c.status === "submitted").length;
+  const approvedCount = items.filter((c) => c.status === "approved").length;
+  const inconsistentCount = items.filter((c) => c.status === "inconsistent").length;
+  const incompleteCount = items.filter((c) => c.status === "incomplete").length;
 
-  const completeCount = items.filter((c) => c.status === "complete").length;
-  const missingCount = items.filter((c) => c.status === "missing" || c.status === "invalid").length;
-  const score = totalSteps ? Math.round((completeCount / totalSteps) * 100) : 0;
-  const documentContext = useMemo(
-    () => ({
-      preAuthKey,
-      claimId,
-      patientName,
-      policyNumber,
-      insurerName,
-      hospitalName,
-      procedure,
-      diagnosis,
-      icdCode,
-      estimatedAmount,
-      sumInsured,
-      submittedAt,
-    }),
-    [
-      preAuthKey,
-      claimId,
-      patientName,
-      policyNumber,
-      insurerName,
-      hospitalName,
-      procedure,
-      diagnosis,
-      icdCode,
-      estimatedAmount,
-      sumInsured,
-      submittedAt,
-    ]
-  );
+  const submissionScore = totalSteps ? Math.round((submittedCount / totalSteps) * 100) : 0;
+  const qualityScore = submittedCount ? Math.round((approvedCount / submittedCount) * 100) : 0;
   const derivedMissingCritical =
     missingCritical.length > 0
       ? missingCritical
-      : items.filter((c) => c.status === "missing" || c.status === "invalid").map((c) => c.label);
+      : checklist.filter((c) => c.status === "missing").map((c) => c.label);
 
   const startAnalysis = useCallback(() => {
     setPhase("running");
@@ -418,10 +78,21 @@ export function AnalysisFlow({
 
   useEffect(() => {
     if (phase !== "running") return;
+
+    // Logic for stepping through items
+    const currentItem = items[step];
+    const isMissing = currentItem.status === "missing";
+
     if (!revealed) {
+      // If missing, skip the "Analyzing..." state instantly
+      if (isMissing) {
+        setRevealed(true);
+        return;
+      }
       const t = setTimeout(() => setRevealed(true), STEP_DURATION_MS);
       return () => clearTimeout(t);
     }
+
     const t = setTimeout(() => {
       if (step < totalSteps - 1) {
         setStep((s) => s + 1);
@@ -431,259 +102,296 @@ export function AnalysisFlow({
       }
     }, REVEAL_DURATION_MS);
     return () => clearTimeout(t);
-  }, [phase, revealed, step, totalSteps]);
+  }, [phase, revealed, step, totalSteps, items]);
 
-  if (phase === "summary") {
+  const renderDocumentItem = (item: PreAuthCheckItem, index: number) => {
+    const isAnalyzed = phase === "summary" || (phase === "running" && (index < step || (index === step && revealed)));
+    const isActuallyCurrent = phase === "running" && index === step && !revealed;
+    const isMissing = item.status === "missing";
+
+    let statusLabel = "";
+    let statusClass = "";
+    let icon = null;
+
+    if (phase === "idle") {
+      if (isMissing) {
+        statusLabel = "Not Provided";
+        statusClass = "bg-slate-100 text-slate-500 border border-slate-200";
+        icon = <div className="h-2 w-2 rounded-full bg-slate-300" />;
+      } else {
+        statusLabel = "Submitted";
+        statusClass = "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm";
+        icon = <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-600"><svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" /></svg></div>;
+      }
+    } else if (isActuallyCurrent) {
+      statusLabel = isMissing ? "Verifying absence..." : "Analyzing content...";
+      statusClass = "bg-teal-50 text-teal-700 border border-teal-100 animate-pulse";
+      icon = (
+        <svg className="h-4 w-4 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      );
+    } else if (isAnalyzed) {
+      if (item.status === "approved") {
+        statusLabel = "AI Approved";
+        statusClass = "bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm";
+        icon = (
+          <div className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        );
+      } else if (item.status === "inconsistent") {
+        statusLabel = "Inconsistent";
+        statusClass = "bg-rose-50 text-rose-700 border border-rose-200 shadow-sm";
+        icon = (
+          <div className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-rose-200 text-rose-700 ring-2 ring-rose-100">
+            <span className="text-xs font-black">!</span>
+          </div>
+        );
+      } else if (item.status === "incomplete") {
+        statusLabel = "Incomplete";
+        statusClass = "bg-amber-50 text-amber-700 border border-amber-200 shadow-sm";
+        icon = (
+          <div className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-amber-200 text-amber-700 ring-2 ring-amber-100">
+            <span className="text-xs font-black">!</span>
+          </div>
+        );
+      } else if (isMissing) {
+        statusLabel = "Missing";
+        statusClass = "bg-slate-50 text-slate-400 border border-slate-200";
+        icon = <div className="h-2 w-2 rounded-full bg-slate-300" />;
+      } else {
+        statusLabel = "Verified";
+        statusClass = "bg-slate-50 text-slate-700 border border-slate-200";
+        icon = <div className="h-5.5 w-5.5 items-center justify-center rounded-full bg-slate-200 text-slate-700">✓</div>;
+      }
+    } else {
+      statusLabel = "Queued";
+      statusClass = "bg-slate-50 text-slate-400";
+      icon = <div className="h-2 w-2 rounded-full bg-slate-200" />;
+    }
+
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-        <div className="bg-gradient-to-br from-teal-600 to-teal-800 px-6 py-8 text-white">
-          <h2 className="text-xl font-semibold tracking-tight">Analysis complete</h2>
-          <p className="mt-1 text-teal-100 text-sm">
-            {claimId} · {procedure}
-          </p>
-          <div className="mt-6 flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/20 text-[22px] font-bold leading-none tracking-tight text-center">
-                {score}%
-              </div>
-              <div>
-                <p className="text-sm text-teal-200">AI Readiness</p>
-                <p className="font-semibold">
-                  {completeCount}/{totalSteps} items complete
-                </p>
-              </div>
+      <div
+        key={item.id}
+        onClick={() => !isMissing && onViewDoc?.(item)}
+        className={`group relative rounded-2xl border transition-all duration-500 
+        ${!isMissing ? "cursor-pointer hover:ring-2 hover:ring-teal-500/20" : ""}
+        ${isActuallyCurrent ? "border-teal-400 bg-teal-50/20 shadow-lg ring-1 ring-teal-200 scale-[1.01]" :
+            (isAnalyzed && item.status === "inconsistent" ? "border-rose-200 bg-rose-50/10" :
+              isAnalyzed && item.status === "incomplete" ? "border-amber-200 bg-amber-50/10" :
+                isAnalyzed && item.status === "approved" ? "border-emerald-100 bg-emerald-50/5" :
+                  "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm")} p-5 mb-3 `}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-5 min-w-0">
+            <div className="mt-0.5 shrink-0 flex items-center justify-center w-6 min-h-[24px]">
+              {icon}
             </div>
-            <div className="h-12 w-px bg-teal-500/50" />
             <div>
-              <p className="text-sm text-teal-200">Estimated amount</p>
-              <p className="text-lg font-semibold">{formatCurrency(estimatedAmount)}</p>
+              <p className={`text-base font-bold tracking-tight ${!isAnalyzed && !isActuallyCurrent ? "text-slate-400" : "text-slate-900"}`}>{item.label}</p>
+
+              {isAnalyzed && (
+                <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
+                  {item.value && (
+                    <div className="flex items-center gap-2 px-2.5 py-1 bg-slate-100/50 rounded-lg w-fit">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Metadata:</span>
+                      <span className="text-xs text-slate-800 font-bold">{item.value}</span>
+                    </div>
+                  )}
+
+                  {item.status !== "approved" && (
+                    <div className={`rounded-xl border-2 px-4 py-3.5 ${item.status === "inconsistent"
+                      ? "bg-rose-50/60 border-rose-100/80"
+                      : "bg-amber-50/60 border-amber-100/80"
+                      }`}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full ${item.status === "inconsistent" ? "bg-rose-500" : "bg-amber-500"
+                          }`} />
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${item.status === "inconsistent"
+                          ? "text-rose-700"
+                          : "text-amber-700"
+                          }`}>
+                          AI Review Summary
+                        </p>
+                      </div>
+                      <p className="text-[13px] text-slate-700 leading-relaxed font-semibold">
+                        {item.aiSuggestion || `Automated verification failed: OCR layer detected structural anomalies or missing mandatory data points in ${item.label}.`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider transition-all shadow-sm ${statusClass}`}>
+            {statusLabel}
+          </span>
         </div>
-        {derivedMissingCritical.length > 0 && (
-          <div className="border-b border-amber-200 bg-amber-50/80 px-6 py-4">
-            <p className="text-sm font-medium text-amber-900">Critical items missing</p>
-            <ul className="mt-1 list-inside list-disc text-sm text-amber-800">
-              {derivedMissingCritical.slice(0, 5).map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* AI Analysis Control Card */}
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-xl overflow-hidden ring-1 ring-slate-100">
+        {phase === "idle" && (
+          <div className="p-8 text-[#0f172a]">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">AI Completeness Check</h2>
+                <p className="text-sm text-slate-500 mt-1">Ready to analyze {submittedCount} submitted documents for inconsistencies.</p>
+              </div>
+              <button
+                type="button"
+                onClick={startAnalysis}
+                className="inline-flex items-center gap-2 rounded-2xl bg-teal-600 px-7 py-3.5 text-base font-bold text-white shadow-lg hover:bg-teal-500 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                </svg>
+                Run AI Review
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 items-center">
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                <div className="flex items-end justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Inventory Status</span>
+                  <span className="text-2xl font-black text-slate-900">{submittedCount}/{totalSteps}</span>
+                </div>
+                <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-teal-500 rounded-full transition-all duration-1000" style={{ width: `${submissionScore}%` }} />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-3 font-medium">Mandatory documents provided by hospital.</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 opacity-60">
+                <div className="flex items-end justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Qualitative Score</span>
+                  <span className="text-2xl font-black text-slate-300">--%</span>
+                </div>
+                <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-teal-200 rounded-full transition-all duration-1000" style={{ width: `0%` }} />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-3 font-medium">Pending AI content verification.</p>
+              </div>
+            </div>
           </div>
         )}
-        <div className="p-6">
-          <p className="text-sm font-medium text-slate-700 mb-4">Recommended action</p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-              disabled={missingCount > 0}
-              title={missingCount > 0 ? "Resolve missing items first" : undefined}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Approve
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 transition-colors"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Deny
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50 px-5 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-300 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 transition-colors"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              Query hospital
-            </button>
-          </div>
-          <p className="mt-4 text-xs text-slate-500">
-            {missingCount > 0
-              ? "Approve is disabled until critical items are received. Use Query hospital to request missing documents."
-              : "All mandatory items present. You may approve or deny per policy."}
-          </p>
-        </div>
-        <div className="border-t border-slate-100 p-6">
-          <p className="text-sm font-medium text-slate-700 mb-3">Document set</p>
-          <div className="space-y-3">
-            {items.map((item) => (
-              <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                    {item.value && item.status === "complete" && (
-                      <p className="mt-1 text-xs text-slate-600">{item.value}</p>
-                    )}
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      item.status === "complete"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : item.status === "missing" || item.status === "invalid"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {item.status === "complete"
-                      ? "Complete"
-                      : item.status === "missing"
-                        ? "Missing"
-                        : item.status === "invalid"
-                          ? "Invalid"
-                          : "Pending"}
-                  </span>
+
+        {phase === "running" && (
+          <div className="p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50">
+                  <svg className="h-6 w-6 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
                 </div>
-                <DocumentDropdown item={item} context={documentContext} />
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">AI Analysis in Progress</h2>
+                  <p className="text-xs text-slate-500">Cross-referencing OCR data with hospital records...</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "idle") {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">AI Completeness Checklist</h2>
-          <p className="mt-0.5 text-sm text-slate-600">
-            Run AI analysis to verify documents against IRDAI circulars. Results will appear step by step.
-          </p>
-        </div>
-        <div className="p-5">
-          <button
-            type="button"
-            onClick={startAnalysis}
-            className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Start analysis
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // phase === "running": show current item checking, then revealed; and list of previous items
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-      <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-700">Running AI checklist</span>
-        <span className="text-xs text-slate-500">
-          Step {step + 1} of {totalSteps}
-        </span>
-      </div>
-      <div className="p-5 space-y-0">
-        {items.slice(0, step).map((item) => (
-          <div
-            key={item.id}
-            className="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0 opacity-90"
-          >
-            <span
-              className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-                item.status === "complete"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : item.status === "missing" || item.status === "invalid"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {item.status === "complete" ? "✓" : item.status === "missing" || item.status === "invalid" ? "!" : "—"}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-slate-900">{item.label}</p>
-              {item.value && item.status === "complete" && (
-                <p className="mt-0.5 text-sm text-slate-600">{item.value}</p>
-              )}
-              {item.aiSuggestion && (item.status === "missing" || item.status === "invalid") && (
-                <p className="mt-1 text-sm text-teal-700 bg-teal-50 rounded-lg px-2 py-1">{item.aiSuggestion}</p>
-              )}
-              <DocumentDropdown item={item} context={documentContext} />
+              <div className="px-4 py-2 bg-slate-100 rounded-2xl border border-slate-200">
+                <span className="text-xs font-black text-slate-600">STEP {step + 1} / {totalSteps}</span>
+              </div>
             </div>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                item.status === "complete"
-                  ? "bg-emerald-100 text-emerald-800"
-                  : item.status === "missing" || item.status === "invalid"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {item.status === "complete" ? "Complete" : item.status === "missing" ? "Missing" : item.status === "invalid" ? "Invalid" : "Pending"}
-            </span>
-          </div>
-        ))}
-        {currentItem && (
-          <div
-            className={`flex items-start gap-3 py-4 rounded-xl transition-all duration-300 ${
-              isChecking ? "bg-slate-50 ring-2 ring-teal-200" : "bg-white"
-            }`}
-          >
-            <span
-              className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors ${
-                isChecking
-                  ? "bg-teal-100 text-teal-700 animate-pulse"
-                  : currentItem.status === "complete"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : currentItem.status === "missing" || currentItem.status === "invalid"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {isChecking ? (
-                <svg className="h-3.5 w-3.5 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : currentItem.status === "complete" ? (
-                "✓"
-              ) : currentItem.status === "missing" || currentItem.status === "invalid" ? (
-                "!"
-              ) : (
-                "—"
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-slate-900">{currentItem.label}</p>
-              {isRevealed && currentItem.value && currentItem.status === "complete" && (
-                <p className="mt-0.5 text-sm text-slate-600">{currentItem.value}</p>
-              )}
-              {isRevealed && currentItem.aiSuggestion && (currentItem.status === "missing" || currentItem.status === "invalid") && (
-                <p className="mt-1 text-sm text-teal-700 bg-teal-50 rounded-lg px-2 py-1">
-                  {currentItem.aiSuggestion}
-                </p>
-              )}
-              {isChecking && (
-                <p className="mt-1 text-sm text-slate-500 italic">Checking against IRDAI guidelines…</p>
-              )}
-              <DocumentDropdown item={currentItem} context={documentContext} />
+
+            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-teal-500 transition-all duration-500 ease-out" style={{ width: `${((step + (revealed ? 1 : 0)) / totalSteps) * 100}%` }} />
             </div>
-            {isRevealed && (
-              <span
-                className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  currentItem.status === "complete"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : currentItem.status === "missing" || currentItem.status === "invalid"
-                      ? "bg-red-100 text-red-800"
-                      : "bg-slate-100 text-slate-600"
-                }`}
+          </div>
+        )}
+
+        {phase === "summary" && (
+          <div className="p-8">
+            <div className="flex items-start justify-between mb-8">
+              <div className="flex items-center gap-5">
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-2xl font-black shadow-lg ${qualityScore >= 80 ? "bg-emerald-600 text-white" : qualityScore >= 50 ? "bg-amber-500 text-white" : "bg-rose-600 text-white"}`}>
+                  {qualityScore}%
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">AI Review Summary</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {approvedCount} approved · {inconsistentCount} inconsistencies · {incompleteCount} incomplete
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={startAnalysis}
+                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm hover:shadow-md"
               >
-                {currentItem.status === "complete" ? "Complete" : currentItem.status === "missing" ? "Missing" : currentItem.status === "invalid" ? "Invalid" : "Pending"}
-              </span>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Re-scan
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-2xl bg-teal-50/50 p-5 border border-teal-100">
+                <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1">Submission Status</p>
+                <p className="text-lg font-bold text-teal-900">{submittedCount} / {totalSteps} Documents</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-5 border border-slate-200">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">AI Quality Score</p>
+                <p className={`text-lg font-bold ${qualityScore >= 80 ? "text-emerald-700" : "text-amber-700"}`}>{qualityScore}% Verified</p>
+              </div>
+            </div>
+
+            {derivedMissingCritical.length > 0 && (
+              <div className="mt-8 rounded-2xl border border-rose-100 bg-rose-50/30 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-2 w-2 rounded-full bg-rose-500" />
+                  <p className="text-sm font-bold text-rose-900 uppercase tracking-tight">Critical Actions Required</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {derivedMissingCritical.map((m) => (
+                    <div key={m} className="flex items-center gap-2 text-sm text-rose-800 font-medium bg-white/50 px-3 py-2 rounded-xl border border-rose-100/50">
+                      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      {m}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Document Set - Separate from the AI card */}
+      <div>
+        <div className="flex items-center justify-between mb-6 px-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Document Inventory</h3>
+            <span className="text-[10px] font-black text-white bg-slate-800 px-2 py-0.5 rounded-full uppercase tracking-widest">
+              {totalSteps} FILES
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+              <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              {submittedCount} Submitted
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+              <div className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+              {totalSteps - submittedCount} Missing
+            </div>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {items.map((item, idx) => renderDocumentItem(item, idx))}
+        </div>
+      </div>
     </div>
   );
 }
+

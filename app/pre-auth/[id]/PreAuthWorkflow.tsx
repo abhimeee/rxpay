@@ -1,178 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import type { PreAuthCheckItem, WorkflowStageId, WorkflowFlaggedItem, PreAuthWorkflowData, FraudRedFlag } from "@/lib/types";
+import { useState, useCallback, useEffect } from "react";
+import type { PreAuthCheckItem, WorkflowStageId, PreAuthWorkflowData, FraudRedFlag } from "@/lib/types";
 import { formatCurrency } from "@/lib/data";
 import { WORKFLOW_STAGES, getWorkflowData } from "@/lib/workflow-data";
 import { AnalysisFlow } from "./AnalysisFlow";
+import { DocumentViewerModal } from "@/app/components/DocumentViewerModal";
+import { getDocumentLinesForItem } from "@/lib/document-helper";
+import { PdfLine } from "@/lib/pdf-generator";
+import { FraudSection } from "./FraudSection";
 
 const STAGE_IDS = WORKFLOW_STAGES.map((s) => s.id);
 
-type FraudBreakdownItem = {
-  title: string;
-  assessment: "Likely" | "Possible" | "Unlikely";
-  detail: string;
-};
 
-const severityRank: Record<FraudRedFlag["severity"], number> = {
-  none: 0,
-  low: 1,
-  medium: 2,
-  high: 3,
-};
-
-const getMaxSeverity = (flags: FraudRedFlag[], category?: FraudRedFlag["category"]) => {
-  const filtered = category ? flags.filter((flag) => flag.category === category) : flags;
-  return filtered.reduce((max, flag) => Math.max(max, severityRank[flag.severity]), 0);
-};
-
-const providerBreakdownsByTier: Record<"low" | "medium" | "high", FraudBreakdownItem[]> = {
-  low: [
-    {
-      title: "Billing for procedures not performed",
-      assessment: "Unlikely",
-      detail: "Docs and timestamps align with procedure claims.",
-    },
-    {
-      title: "Billing for procedures more frequently than clinically justified",
-      assessment: "Possible",
-      detail: "Utilization is slightly above peer benchmarks for diagnosis.",
-    },
-    {
-      title: "Coding procedures as more expensive than what was actually done",
-      assessment: "Possible",
-      detail: "Codes appear higher than documented complexity in a few items.",
-    },
-    {
-      title: "Admitting patients for unnecessary extended stays",
-      assessment: "Unlikely",
-      detail: "Length of stay aligns with clinical severity.",
-    },
-    {
-      title: "Unnecessary tests bundled with all cases",
-      assessment: "Possible",
-      detail: "Routine add-ons appear across cases without clear indication.",
-    },
-  ],
-  medium: [
-    {
-      title: "Upcoding or inflated procedure complexity",
-      assessment: "Likely",
-      detail: "Coding intensity is above peers; narratives do not justify upgrades.",
-    },
-    {
-      title: "Bundling non-essential tests into standard packages",
-      assessment: "Likely",
-      detail: "Repeat add-on tests appear across multiple cases without indication.",
-    },
-    {
-      title: "Billing for procedures more frequently than clinically justified",
-      assessment: "Possible",
-      detail: "Case frequency outpaces expected rates for this diagnosis.",
-    },
-    {
-      title: "Extended stays without documentation of complications",
-      assessment: "Possible",
-      detail: "Length-of-stay patterns exceed norms for similar admissions.",
-    },
-  ],
-  high: [
-    {
-      title: "Phantom or non-rendered services",
-      assessment: "Likely",
-      detail: "Services billed without matching operative or nursing records.",
-    },
-    {
-      title: "Systematic upcoding to higher reimbursement bands",
-      assessment: "Likely",
-      detail: "Procedure codes consistently exceed documented complexity levels.",
-    },
-    {
-      title: "Repeat admissions and duplicate billing patterns",
-      assessment: "Possible",
-      detail: "Similar procedures billed across overlapping dates or facilities.",
-    },
-    {
-      title: "Unnecessary tests bundled with all cases",
-      assessment: "Likely",
-      detail: "Routine tests billed regardless of clinical indication.",
-    },
-  ],
-};
-
-const patientBreakdownsByTier: Record<"low" | "medium" | "high", FraudBreakdownItem[]> = {
-  low: [
-    {
-      title: "Submitting false documentation",
-      assessment: "Unlikely",
-      detail: "Signatures and timestamps match facility records.",
-    },
-    {
-      title: "Claiming treatment at a hospital but actually getting it elsewhere",
-      assessment: "Possible",
-      detail: "Location codes differ from scheduling logs.",
-    },
-    {
-      title: "Misrepresenting pre-existing conditions",
-      assessment: "Possible",
-      detail: "Minor inconsistencies noted in historical records.",
-    },
-  ],
-  medium: [
-    {
-      title: "Misrepresenting pre-existing conditions",
-      assessment: "Likely",
-      detail: "History conflicts with prior claims and chronic medication records.",
-    },
-    {
-      title: "Using another member's policy or identity",
-      assessment: "Possible",
-      detail: "ID metadata and beneficiary details do not align cleanly.",
-    },
-    {
-      title: "Claiming treatment at a hospital but receiving it elsewhere",
-      assessment: "Possible",
-      detail: "Facility codes differ from scheduling logs and travel metadata.",
-    },
-  ],
-  high: [
-    {
-      title: "Policy misuse or identity mismatch",
-      assessment: "Likely",
-      detail: "Identity attributes conflict with enrollment and prior claim data.",
-    },
-    {
-      title: "Staged or exaggerated clinical presentation",
-      assessment: "Likely",
-      detail: "Clinical notes diverge from prior records and baseline history.",
-    },
-    {
-      title: "Duplicate claims across facilities or time windows",
-      assessment: "Possible",
-      detail: "Overlapping treatment windows and repeated submissions detected.",
-    },
-  ],
-};
-
-const getFraudBreakdowns = (flags: FraudRedFlag[]) => {
-  const providerSeverity = getMaxSeverity(flags, "provider");
-  const patientSeverity = getMaxSeverity(flags, "patient");
-  const documentSeverity = getMaxSeverity(flags, "document");
-
-  const providerTier = providerSeverity >= 3 ? "high" : providerSeverity >= 2 ? "medium" : documentSeverity >= 2 ? "medium" : "low";
-  const patientTier = patientSeverity >= 3 ? "high" : patientSeverity >= 2 ? "medium" : patientSeverity >= 1 ? "medium" : "low";
-
-  return {
-    providerBreakdowns: providerBreakdownsByTier[providerTier],
-    patientBreakdowns: patientBreakdownsByTier[patientTier],
-  };
-};
-
-const assessmentStyles: Record<string, string> = {
-  Likely: "border-red-200 bg-red-50/70",
-  Possible: "border-amber-200 bg-amber-50/70",
-  Unlikely: "border-emerald-200 bg-emerald-50/70",
-};
 
 interface PreAuthWorkflowProps {
   preAuthId: string;
@@ -191,6 +31,7 @@ interface PreAuthWorkflowProps {
   checklist: PreAuthCheckItem[];
   analysisResult: PreAuthCheckItem[] | null;
   missingCritical: string[];
+  externalOpenDoc?: (type: string, item: any, context?: any) => void;
 }
 
 export function PreAuthWorkflow({
@@ -210,32 +51,88 @@ export function PreAuthWorkflow({
   checklist,
   analysisResult,
   missingCritical,
+  externalOpenDoc,
 }: PreAuthWorkflowProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [flaggedItems, setFlaggedItems] = useState<WorkflowFlaggedItem[]>([]);
-  const [decisionMade, setDecisionMade] = useState<"approve" | "deny" | "query" | "conditional" | null>(null);
 
-  const workflowData = getWorkflowData(preAuthId);
+  const [decisionMade, setDecisionMade] = useState<"approve" | "deny" | "query" | "conditional" | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+
+  // Local state for workflow data to allow status overrides
+  const [localWorkflowData, setLocalWorkflowData] = useState<PreAuthWorkflowData | null | undefined>(() => getWorkflowData(preAuthId));
+
+  useEffect(() => {
+    setLocalWorkflowData(getWorkflowData(preAuthId));
+  }, [preAuthId]);
+
+  const openDoc = (type: string, item: any, context?: any) => {
+    if (externalOpenDoc) {
+      externalOpenDoc(type, item, context);
+      return;
+    }
+  };
+
+  const updateEligibilityStatus = (itemId: string, newStatus: string) => {
+    if (!localWorkflowData) return;
+    setLocalWorkflowData({
+      ...localWorkflowData,
+      eligibility: localWorkflowData.eligibility.map((item) =>
+        item.id === itemId ? { ...item, status: newStatus as any } : item
+      ),
+    });
+  };
+
+  const updateCodingStatus = (type: "icd10" | "cpt", itemId: string, newStatus: string) => {
+    if (!localWorkflowData) return;
+    setLocalWorkflowData({
+      ...localWorkflowData,
+      coding: {
+        ...localWorkflowData.coding,
+        [type]: localWorkflowData.coding[type].map((item) =>
+          item.id === itemId ? { ...item, status: newStatus } : item
+        ),
+      },
+    });
+  };
+
+  const updateMedicalNecessityStatus = (itemId: string, newStatus: string) => {
+    if (!localWorkflowData) return;
+    setLocalWorkflowData({
+      ...localWorkflowData,
+      medicalNecessity: localWorkflowData.medicalNecessity.map((item) =>
+        item.id === itemId ? { ...item, status: newStatus as any } : item
+      ),
+    });
+  };
+
+  const updateInsightStatus = (insightId: string, field: "irdaApproved" | "policyApproved", value: boolean) => {
+    if (!localWorkflowData) return;
+    setLocalWorkflowData({
+      ...localWorkflowData,
+      medicalNecessityInsights: localWorkflowData.medicalNecessityInsights.map((insight) =>
+        insight.id === insightId ? { ...insight, [field]: value } : insight
+      ),
+    });
+  };
   const stageId = STAGE_IDS[currentStep];
   const isLastStep = currentStep === STAGE_IDS.length - 1;
   const isDecisionStep = stageId === "queries_and_decision";
 
-  const toggleFlag = useCallback(
-    (stageId: WorkflowStageId, itemId: string, label: string, note?: string) => {
-      setFlaggedItems((prev) => {
-        const exists = prev.some((f) => f.stageId === stageId && f.itemId === itemId);
-        if (exists) return prev.filter((f) => !(f.stageId === stageId && f.itemId === itemId));
-        return [...prev, { stageId, itemId, label, note }];
-      });
-    },
-    []
-  );
+  const markStepComplete = useCallback((idx: number) => {
+    setCompletedSteps((prev) => (prev.includes(idx) ? prev : [...prev, idx]));
+  }, []);
 
-  const isFlagged = useCallback(
-    (stageId: WorkflowStageId, itemId: string) =>
-      flaggedItems.some((f) => f.stageId === stageId && f.itemId === itemId),
-    [flaggedItems]
-  );
+  useEffect(() => {
+    if (decisionMade && isDecisionStep) {
+      markStepComplete(currentStep);
+    }
+  }, [decisionMade, isDecisionStep, currentStep, markStepComplete]);
+
+
+
+
+
+  const isStepCompleted = completedSteps.includes(currentStep);
 
   const goNext = useCallback(() => {
     if (currentStep < STAGE_IDS.length - 1) setCurrentStep((s) => s + 1);
@@ -246,10 +143,10 @@ export function PreAuthWorkflow({
   }, [currentStep]);
 
   const items = analysisResult ?? checklist;
-  const completeCount = items.filter((c) => c.status === "complete").length;
+  const approvedCount = items.filter((c) => c.status === "approved").length;
   const totalChecklist = items.length;
-  const docScore = totalChecklist ? Math.round((completeCount / totalChecklist) * 100) : 0;
-  const canApprove = docScore >= 80 && (workflowData?.queries.length ?? 0) === 0;
+  const docScore = totalChecklist ? Math.round((approvedCount / totalChecklist) * 100) : 0;
+  const canApprove = docScore >= 80 && (localWorkflowData?.queries.length ?? 0) === 0;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden min-w-0">
@@ -268,31 +165,33 @@ export function PreAuthWorkflow({
             Workflow
           </p>
           <nav className="space-y-0.5" aria-label="Workflow stages">
-            {WORKFLOW_STAGES.map((stage, idx) => (
-              <button
-                key={stage.id}
-                type="button"
-                onClick={() => setCurrentStep(idx)}
-                className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
-                  idx === currentStep
+            {WORKFLOW_STAGES.map((stage, idx) => {
+              const isCompleted = completedSteps.includes(idx);
+              const isActive = idx === currentStep;
+              return (
+                <button
+                  key={stage.id}
+                  type="button"
+                  onClick={() => setCurrentStep(idx)}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-all duration-200 ${isActive
                     ? "bg-teal-600 text-white shadow-md font-medium"
-                    : idx < currentStep
+                    : isCompleted
                       ? "bg-teal-50 text-teal-800 hover:bg-teal-100"
                       : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${
-                      idx === currentStep ? "bg-white/20" : idx < currentStep ? "bg-teal-200 text-teal-800" : "bg-slate-200 text-slate-600"
                     }`}
-                  >
-                    {idx < currentStep ? "✓" : idx + 1}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${isActive ? "bg-white/20" : isCompleted ? "bg-teal-200 text-teal-800" : "bg-slate-200 text-slate-600"
+                        }`}
+                    >
+                      {isCompleted ? "✓" : idx + 1}
+                    </span>
+                    {stage.shortTitle}
                   </span>
-                  {stage.shortTitle}
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -312,20 +211,6 @@ export function PreAuthWorkflow({
               </p>
             </div>
 
-            {/* Stage 1: Request Initiation */}
-            {stageId === "request_initiation" && (
-              workflowData ? (
-              <RequestInitiationContent
-                data={workflowData.requestSummary}
-                onToggleFlag={(itemId, label) => toggleFlag("request_initiation", itemId, label)}
-                isFlagged={(itemId) => isFlagged("request_initiation", itemId)}
-              />
-              ) : (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
-                  Workflow demo data not loaded for this pre-auth.
-                </div>
-              )
-            )}
 
             {/* Stage 2: Documentation */}
             {stageId === "documentation" && (
@@ -346,54 +231,55 @@ export function PreAuthWorkflow({
                   icdCode={icdCode}
                   sumInsured={sumInsured}
                   submittedAt={submittedAt}
+                  onViewDoc={(item) => openDoc("Request Item", item)}
                 />
                 <p className="text-xs text-slate-500">
-                  IRDAI: Decision within 1 hour of complete documentation. Missing items require query to hospital.
+                  Decision within 1 hour of complete documentation. Missing items require query to hospital.
                 </p>
               </div>
             )}
 
             {/* Stage 3: Eligibility */}
-            {stageId === "eligibility" && (workflowData ? (
+            {stageId === "eligibility" && (localWorkflowData ? (
               <EligibilityContent
-                items={workflowData.eligibility}
-                onToggleFlag={(itemId, label) => toggleFlag("eligibility", itemId, label)}
-                isFlagged={(itemId) => isFlagged("eligibility", itemId)}
+                items={localWorkflowData.eligibility}
+                onViewDoc={(item) => openDoc("Eligibility", item)}
+                onStatusChange={updateEligibilityStatus}
               />
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
             ))}
 
             {/* Stage 4: Medical Coding */}
-            {stageId === "medical_coding" && (workflowData ? (
+            {stageId === "medical_coding" && (localWorkflowData ? (
               <CodingContent
-                coding={workflowData.coding}
-                onToggleFlag={(itemId, label) => toggleFlag("medical_coding", itemId, label)}
-                isFlagged={(itemId) => isFlagged("medical_coding", itemId)}
+                coding={localWorkflowData.coding}
+                onViewDoc={(item) => openDoc("Medical Coding", item)}
+                onStatusChange={updateCodingStatus}
               />
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
             ))}
 
             {/* Stage 5: Medical Necessity */}
-            {stageId === "medical_necessity" && (workflowData ? (
+            {stageId === "medical_necessity" && (localWorkflowData ? (
               <MedicalNecessityContent
-                items={workflowData.medicalNecessity}
-                score={workflowData.medicalNecessityScore}
-                insights={workflowData.medicalNecessityInsights}
-                onToggleFlag={(itemId, label) => toggleFlag("medical_necessity", itemId, label)}
-                isFlagged={(itemId) => isFlagged("medical_necessity", itemId)}
+                items={localWorkflowData.medicalNecessity}
+                score={localWorkflowData.medicalNecessityScore}
+                insights={localWorkflowData.medicalNecessityInsights}
+                onViewDoc={(item) => openDoc("Medical Necessity", item)}
+                onStatusChange={updateMedicalNecessityStatus}
+                onInsightStatusChange={updateInsightStatus}
               />
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
             ))}
 
             {/* Stage 6: Fraud & Anomaly */}
-            {stageId === "fraud_anomaly" && (workflowData ? (
-              <FraudContent
-                flags={workflowData.fraudFlags}
-                onToggleFlag={(itemId, label) => toggleFlag("fraud_anomaly", itemId, label)}
-                isFlagged={(itemId) => isFlagged("fraud_anomaly", itemId)}
+            {stageId === "fraud_anomaly" && (localWorkflowData ? (
+              <FraudSection
+                flags={localWorkflowData.fraudFlags}
+                onViewDoc={(item) => openDoc("Fraud & Anomaly", item)}
               />
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
@@ -402,17 +288,15 @@ export function PreAuthWorkflow({
             {/* Stage 7: Queries & Decision (merged) */}
             {stageId === "queries_and_decision" && (
               <div className="space-y-6">
-                {workflowData ? (
+                {localWorkflowData ? (
                   <QueryContent
-                    queries={workflowData.queries}
-                    onToggleFlag={(itemId, label) => toggleFlag("queries_and_decision", itemId, label)}
-                    isFlagged={(itemId) => isFlagged("queries_and_decision", itemId)}
+                    queries={localWorkflowData.queries}
+                    onViewDoc={(item) => openDoc("Query", item)}
                   />
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-slate-500 text-sm">Workflow demo data not loaded.</div>
                 )}
                 <DecisionContent
-                  flaggedItems={flaggedItems}
                   canApprove={canApprove}
                   procedure={procedure}
                   estimatedAmount={estimatedAmount}
@@ -438,115 +322,59 @@ export function PreAuthWorkflow({
                 </svg>
                 Previous
               </button>
-              <button
-                type="button"
-                onClick={goNext}
-                className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors"
-              >
-                {isLastStep ? "Queries & decision" : "Next step"}
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => markStepComplete(currentStep)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-all duration-200 ${isStepCompleted
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-teal-600 text-white hover:bg-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                    }`}
+                >
+                  {isStepCompleted ? (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Completed
+                    </>
+                  ) : (
+                    "Mark as complete"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  {isLastStep ? "Queries & decision" : "Next step"}
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
     </div>
   );
 }
 
 // --- Stage content components ---
 
-function FlagCheckbox({
-  checked,
-  onChange,
-  title = "Flag for hospital",
-}: {
-  checked: boolean;
-  onChange: () => void;
-  title?: string;
-}) {
-  return (
-    <label
-      className="inline-flex cursor-pointer items-center justify-center rounded p-1.5 transition-colors hover:bg-slate-100"
-      title={title}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="sr-only"
-        aria-label={title}
-      />
-      <svg
-        className={`h-5 w-5 shrink-0 transition-colors ${checked ? "text-red-500" : "text-slate-400 hover:text-red-400"}`}
-        fill="currentColor"
-        viewBox="0 0 24 24"
-        aria-hidden
-      >
-        <path d="M5 2v20h2V14h8l2-4-2-4H7V2H5z" />
-      </svg>
-    </label>
-  );
-}
 
-function RequestInitiationContent({
-  data,
-  onToggleFlag,
-  isFlagged,
-}: {
-  data: PreAuthWorkflowData["requestSummary"];
-  onToggleFlag: (itemId: string, label: string) => void;
-  isFlagged: (itemId: string) => boolean;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${
-            data.admissionType === "emergency" ? "bg-rose-100 text-rose-800" : "bg-sky-100 text-sky-800"
-          }`}
-        >
-          {data.admissionType === "emergency" ? "Emergency" : "Planned"}
-        </span>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${
-            data.submittedWithinSLA ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-          }`}
-        >
-          {data.submittedWithinSLA ? "Submitted within SLA" : "Late submission"}
-        </span>
-      </div>
-      <ul className="space-y-2">
-        {data.items.map((item, idx) => (
-          <li
-            key={idx}
-            className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg bg-slate-50 border border-slate-100"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-slate-800">{item.label}</p>
-              <p className="text-sm text-slate-600">{item.value}</p>
-            </div>
-            <FlagCheckbox
-              checked={isFlagged(`req-${idx}`)}
-              onChange={() => onToggleFlag(`req-${idx}`, item.label)}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+
 
 function EligibilityContent({
   items,
-  onToggleFlag,
-  isFlagged,
+  onViewDoc,
+  onStatusChange,
 }: {
   items: PreAuthWorkflowData["eligibility"];
-  onToggleFlag: (itemId: string, label: string) => void;
-  isFlagged: (itemId: string) => boolean;
+  onViewDoc: (item: PreAuthWorkflowData["eligibility"][number]) => void;
+  onStatusChange: (itemId: string, newStatus: string) => void;
 }) {
   return (
     <ul className="space-y-3">
@@ -559,23 +387,40 @@ function EligibilityContent({
             <p className="font-medium text-slate-900">{item.label}</p>
             <p className="text-sm text-slate-600 mt-0.5">{item.value}</p>
             {item.detail && <p className="text-xs text-slate-500 mt-1">{item.detail}</p>}
+            <button
+              onClick={() => onViewDoc(item)}
+              className="mt-2.5 inline-flex items-center gap-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-tight"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Verify Source
+            </button>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                item.status === "pass"
-                  ? "bg-emerald-100 text-emerald-800"
+            <div className="relative">
+              <select
+                value={item.status}
+                onChange={(e) => onStatusChange(item.id, e.target.value)}
+                className={`appearance-none rounded-full py-0.5 pl-3 pr-7 text-xs font-medium border-0 focus:ring-2 focus:ring-opacity-50 cursor-pointer transition-colors ${item.status === "pass"
+                  ? "bg-emerald-100 text-emerald-800 focus:ring-emerald-500"
                   : item.status === "fail"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-amber-100 text-amber-800"
-              }`}
-            >
-              {item.status === "pass" ? "Pass" : item.status === "fail" ? "Fail" : "Review"}
-            </span>
-            <FlagCheckbox
-              checked={isFlagged(item.id)}
-              onChange={() => onToggleFlag(item.id, item.label)}
-            />
+                    ? "bg-red-100 text-red-800 focus:ring-red-500"
+                    : "bg-amber-100 text-amber-800 focus:ring-amber-500"
+                  }`}
+              >
+                <option value="pass">Pass</option>
+                <option value="review">Review later</option>
+                <option value="fail">Fail</option>
+                <option value="seek_clarification">Seek clarification from hospital</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5">
+                <svg className="h-3 w-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
         </li>
       ))}
@@ -585,12 +430,12 @@ function EligibilityContent({
 
 function CodingContent({
   coding,
-  onToggleFlag,
-  isFlagged,
+  onViewDoc,
+  onStatusChange,
 }: {
   coding: PreAuthWorkflowData["coding"];
-  onToggleFlag: (itemId: string, label: string) => void;
-  isFlagged: (itemId: string) => boolean;
+  onViewDoc: (item: PreAuthWorkflowData["coding"]["icd10"][number] | PreAuthWorkflowData["coding"]["cpt"][number]) => void;
+  onStatusChange: (type: "icd10" | "cpt", itemId: string, newStatus: string) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -605,16 +450,36 @@ function CodingContent({
               <div>
                 <span className="font-mono font-medium text-slate-800">{item.code}</span>
                 <span className="text-slate-600 ml-2">{item.description}</span>
+                <button
+                  onClick={() => onViewDoc(item)}
+                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Verify Source
+                </button>
               </div>
               <div className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    item.status === "valid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                  }`}
-                >
-                  {item.status === "valid" ? "Valid" : item.status}
-                </span>
-                <FlagCheckbox checked={isFlagged(item.id)} onChange={() => onToggleFlag(item.id, item.code)} />
+                <div className="relative">
+                  <select
+                    value={item.status}
+                    onChange={(e) => onStatusChange("icd10", item.id, e.target.value)}
+                    className={`appearance-none rounded-full py-0.5 pl-3 pr-7 text-xs font-medium border-0 focus:ring-2 focus:ring-opacity-50 cursor-pointer ${item.status === "valid" ? "bg-emerald-100 text-emerald-800 focus:ring-emerald-500" : "bg-amber-100 text-amber-800 focus:ring-amber-500"
+                      }`}
+                  >
+                    <option value="valid">Valid</option>
+                    <option value="review">Review later</option>
+                    <option value="invalid">Invalid</option>
+                    <option value="seek_clarification">Seek clarification from hospital</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5">
+                    <svg className="h-3 w-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </li>
           ))}
@@ -631,16 +496,36 @@ function CodingContent({
               <div>
                 <span className="font-mono font-medium text-slate-800">{item.code}</span>
                 <span className="text-slate-600 ml-2">{item.description}</span>
+                <button
+                  onClick={() => onViewDoc(item)}
+                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Verify Source
+                </button>
               </div>
               <div className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    item.status === "valid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                  }`}
-                >
-                  {item.status === "valid" ? "Valid" : item.status}
-                </span>
-                <FlagCheckbox checked={isFlagged(item.id)} onChange={() => onToggleFlag(item.id, item.code)} />
+                <div className="relative">
+                  <select
+                    value={item.status}
+                    onChange={(e) => onStatusChange("cpt", item.id, e.target.value)}
+                    className={`appearance-none rounded-full py-0.5 pl-3 pr-7 text-xs font-medium border-0 focus:ring-2 focus:ring-opacity-50 cursor-pointer ${item.status === "valid" ? "bg-emerald-100 text-emerald-800 focus:ring-emerald-500" : "bg-amber-100 text-amber-800 focus:ring-amber-500"
+                      }`}
+                  >
+                    <option value="valid">Valid</option>
+                    <option value="review">Review later</option>
+                    <option value="invalid">Invalid</option>
+                    <option value="seek_clarification">Seek clarification from hospital</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5">
+                    <svg className="h-3 w-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </li>
           ))}
@@ -657,17 +542,19 @@ function MedicalNecessityContent({
   items,
   score,
   insights,
-  onToggleFlag,
-  isFlagged,
+  onViewDoc,
+  onStatusChange,
+  onInsightStatusChange,
 }: {
   items: PreAuthWorkflowData["medicalNecessity"];
   score: PreAuthWorkflowData["medicalNecessityScore"];
   insights: PreAuthWorkflowData["medicalNecessityInsights"];
-  onToggleFlag: (itemId: string, label: string) => void;
-  isFlagged: (itemId: string) => boolean;
+  onViewDoc: (item: PreAuthWorkflowData["medicalNecessity"][number] | { source: string; finding: string; label: string }) => void;
+  onStatusChange: (itemId: string, newStatus: string) => void;
+  onInsightStatusChange: (insightId: string, field: "irdaApproved" | "policyApproved", value: boolean) => void;
 }) {
   const levelNames: Record<number, string> = {
-    1: "IRDAI / Law",
+    1: "Law / Regulations",
     2: "Insurer policy",
     3: "InterQual / tools",
     4: "Literature",
@@ -702,40 +589,48 @@ function MedicalNecessityContent({
                   <span className="font-semibold text-slate-700">Procedure:</span> {insight.procedureDescription}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      insight.irdaApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    IRDAI: {insight.irdaApproved ? "Yes" : "Review"}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      insight.policyApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    Policy: {insight.policyApproved ? "Yes" : "Review"}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-medium text-slate-600">Approved:</span>
+                    <select
+                      value={insight.irdaApproved ? "yes" : "review"}
+                      onChange={(e) => onInsightStatusChange(insight.id, "irdaApproved", e.target.value === "yes")}
+                      className={`appearance-none rounded-full py-0.5 pl-2 pr-5 text-[10px] font-medium border-0 focus:ring-0 cursor-pointer ${insight.irdaApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}
+                    >
+                      <option value="yes">Yes</option>
+                      <option value="review">Review later</option>
+                      <option value="seek_clarification">Seek clarification from hospital</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-medium text-slate-600">Policy:</span>
+                    <select
+                      value={insight.policyApproved ? "yes" : "review"}
+                      onChange={(e) => onInsightStatusChange(insight.id, "policyApproved", e.target.value === "yes")}
+                      className={`appearance-none rounded-full py-0.5 pl-2 pr-5 text-[10px] font-medium border-0 focus:ring-0 cursor-pointer ${insight.policyApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}
+                    >
+                      <option value="yes">Yes</option>
+                      <option value="review">Review later</option>
+                      <option value="seek_clarification">Seek clarification from hospital</option>
+                    </select>
+                  </div>
                   <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">
                     AI view
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-slate-500">{insight.aiSummary}</p>
-                  <a
-                    href={insight.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => onViewDoc({ source: insight.sourceLabel, finding: insight.aiSummary, label: insight.sourceLabel })}
                     className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                   >
                     {insight.sourceLabel}
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 3h7v7" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 14L21 3" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21 14v7h-7" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10V3h7" />
                     </svg>
-                  </a>
+                  </button>
                 </div>
               </div>
             </details>
@@ -752,20 +647,39 @@ function MedicalNecessityContent({
               <span className="text-xs font-medium text-slate-500">Level {item.level}: {levelNames[item.level]}</span>
               <p className="font-medium text-slate-900 mt-0.5">{item.source}</p>
               <p className="text-sm text-slate-600">{item.finding}</p>
+              <button
+                onClick={() => onViewDoc(item)}
+                className="mt-2.5 inline-flex items-center gap-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-tight"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Verify Source
+              </button>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  item.status === "met"
-                    ? "bg-emerald-100 text-emerald-800"
+              <div className="relative">
+                <select
+                  value={item.status}
+                  onChange={(e) => onStatusChange(item.id, e.target.value)}
+                  className={`appearance-none rounded-full py-0.5 pl-3 pr-7 text-xs font-medium border-0 focus:ring-2 focus:ring-opacity-50 cursor-pointer ${item.status === "met"
+                    ? "bg-emerald-100 text-emerald-800 focus:ring-emerald-500"
                     : item.status === "not_met"
-                      ? "bg-red-100 text-red-800"
-                      : "bg-amber-100 text-amber-800"
-                }`}
-              >
-                {item.status === "met" ? "Met" : item.status === "not_met" ? "Not met" : "Conditional"}
-              </span>
-              <FlagCheckbox checked={isFlagged(item.id)} onChange={() => onToggleFlag(item.id, item.source)} />
+                      ? "bg-red-100 text-red-800 focus:ring-red-500"
+                      : "bg-amber-100 text-amber-800 focus:ring-amber-500"
+                    }`}
+                >
+                  <option value="met">Met</option>
+                  <option value="conditional">Conditional</option>
+                  <option value="not_met">Not met</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5">
+                  <svg className="h-3 w-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </li>
         ))}
@@ -774,145 +688,13 @@ function MedicalNecessityContent({
   );
 }
 
-function FraudContent({
-  flags,
-  onToggleFlag,
-  isFlagged,
-}: {
-  flags: PreAuthWorkflowData["fraudFlags"];
-  onToggleFlag: (itemId: string, label: string) => void;
-  isFlagged: (itemId: string) => boolean;
-}) {
-  const fraudScore = flags.length
-    ? Math.max(
-        ...flags.map((flag) =>
-          flag.severity === "high" ? 92 : flag.severity === "medium" ? 74 : flag.severity === "low" ? 48 : 12
-        )
-      )
-    : 0;
-  const hasSuspectedFraud = flags.some((flag) => flag.severity === "high" || flag.severity === "medium");
-  const { providerBreakdowns, patientBreakdowns } = getFraudBreakdowns(flags);
-
-  return (
-    <div className="space-y-4">
-      {hasSuspectedFraud && (
-        <div className="rounded-xl border-2 border-red-500 bg-red-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-red-800">Critical: suspected fraud detected</p>
-              <p className="text-xs text-red-700 mt-0.5">
-                Escalate to compliance immediately. Do not investigate directly—document and pend.
-              </p>
-            </div>
-            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-              High priority
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-        <span className="font-semibold text-slate-900">Fraud score</span>
-        <span className="font-mono text-slate-900">{fraudScore}/100</span>
-        <span className="text-slate-500">based on anomaly strength, coding variance, and peer benchmarks</span>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-slate-900">Detected signals</h3>
-        <ul className="mt-2 space-y-2">
-          {flags.map((f) => (
-            <li
-              key={f.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg border border-slate-100 bg-slate-50/50"
-            >
-              <div>
-                <span
-                  className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium mr-2 ${
-                    f.severity === "high"
-                      ? "bg-red-100 text-red-800"
-                      : f.severity === "medium"
-                        ? "bg-amber-100 text-amber-800"
-                        : f.severity === "low"
-                          ? "bg-slate-200 text-slate-700"
-                          : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {f.severity}
-                </span>
-                <span className="text-xs text-slate-500 capitalize">{f.category}</span>
-                <p className="text-sm text-slate-800 mt-0.5">{f.description}</p>
-              </div>
-              <FlagCheckbox
-                checked={isFlagged(f.id)}
-                onChange={() => onToggleFlag(f.id, f.description.slice(0, 40))}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Provider-side fraud breakdown</h3>
-        <div className="space-y-2">
-          {providerBreakdowns.map((item) => (
-            <details
-              key={item.title}
-              className={`group rounded-lg border ${
-                assessmentStyles[item.assessment] ?? "border-slate-200 bg-slate-50"
-              }`}
-            >
-              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-slate-800">
-                <span className="min-w-[220px]">{item.title}</span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-sm">
-                  {item.assessment}
-                </span>
-              </summary>
-              <div className="px-3 pb-2 text-xs text-slate-600">
-                {item.detail}
-              </div>
-            </details>
-          ))}
-        </div>
-      </div>
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Patient-side fraud breakdown</h3>
-        <div className="space-y-2">
-          {patientBreakdowns.map((item) => (
-            <details
-              key={item.title}
-              className={`group rounded-lg border ${
-                assessmentStyles[item.assessment] ?? "border-slate-200 bg-slate-50"
-              }`}
-            >
-              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-slate-800">
-                <span className="min-w-[220px]">{item.title}</span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-sm">
-                  {item.assessment}
-                </span>
-              </summary>
-              <div className="px-3 pb-2 text-xs text-slate-600">
-                {item.detail}
-              </div>
-            </details>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-xs text-slate-500">
-        Flag and escalate to compliance if fraud suspected. Do not investigate—document and pend if needed.
-      </p>
-    </div>
-  );
-}
 
 function QueryContent({
   queries,
-  onToggleFlag,
-  isFlagged,
+  onViewDoc,
 }: {
   queries: PreAuthWorkflowData["queries"];
-  onToggleFlag: (itemId: string, label: string) => void;
-  isFlagged: (itemId: string) => boolean;
+  onViewDoc: (item: any) => void;
 }) {
   if (queries.length === 0) {
     return (
@@ -933,24 +715,33 @@ function QueryContent({
             <p className="text-sm font-medium text-amber-900">Query</p>
             <p className="text-slate-800 mt-0.5">{q.question}</p>
             {q.dueDate && (
-              <p className="text-xs text-slate-500 mt-1">Response due: {q.dueDate} (7 days per IRDAI)</p>
+              <p className="text-xs text-slate-500 mt-1">Response due: {q.dueDate} (7 days)</p>
             )}
+            <button
+              onClick={() => onViewDoc({ label: "Query Record", value: q.question })}
+              className="mt-2 inline-flex items-center gap-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-tight"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Verify Source
+            </button>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-200 text-amber-900">
               {q.status}
             </span>
-            <FlagCheckbox checked={isFlagged(q.id)} onChange={() => onToggleFlag(q.id, q.question.slice(0, 30))} />
+
           </div>
         </li>
       ))}
-      <p className="text-xs text-slate-500">Raise queries within 4 hours (IRDAI). Default denial if no response by day 7.</p>
+      <p className="text-xs text-slate-500">Raise queries within 4 hours. Default denial if no response by day 7.</p>
     </ul>
   );
 }
 
 function DecisionContent({
-  flaggedItems,
   canApprove,
   procedure,
   estimatedAmount,
@@ -958,7 +749,6 @@ function DecisionContent({
   decisionMade,
   onDecision,
 }: {
-  flaggedItems: WorkflowFlaggedItem[];
   canApprove: boolean;
   procedure: string;
   estimatedAmount: number;
@@ -968,86 +758,77 @@ function DecisionContent({
 }) {
   return (
     <div className="space-y-6">
-      {flaggedItems.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
-          <h3 className="font-semibold text-amber-900">Flagged for hospital summary</h3>
-          <p className="text-sm text-amber-800 mt-0.5">The following will be included when communicating with the hospital:</p>
-          <ul className="mt-2 list-disc list-inside text-sm text-amber-900 space-y-0.5">
-            {flaggedItems.map((f, i) => (
-              <li key={i}><span className="font-medium">{f.label}</span> {f.note && `— ${f.note}`}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm text-slate-600"><strong>Claim:</strong> {claimId}</p>
         <p className="text-sm text-slate-600"><strong>Procedure:</strong> {procedure}</p>
         <p className="text-sm text-slate-600"><strong>Estimated amount:</strong> {formatCurrency(estimatedAmount)}</p>
-        <p className="text-xs text-slate-500 mt-2">TAT: Communicate decision within 1 hour of complete documentation (IRDAI).</p>
+        <p className="text-xs text-slate-500 mt-2">TAT: Communicate decision within 1 hour of complete documentation.</p>
       </div>
 
-      {decisionMade ? (
-        <div className="rounded-xl border-2 border-teal-300 bg-teal-50 p-5 text-center">
-          <p className="font-semibold text-teal-900 capitalize">Decision: {decisionMade}</p>
-          <p className="text-sm text-teal-700 mt-1">
-            {decisionMade === "approve" && "Authorization number will be issued; validity 15 days."}
-            {decisionMade === "deny" && "Denial reason and appeal rights will be communicated."}
-            {decisionMade === "query" && "Specific queries sent to hospital; 7-day response deadline."}
-            {decisionMade === "conditional" && "Approval with conditions; hospital must confirm parameters."}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => onDecision("approve")}
-            disabled={!canApprove}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            Approve
-          </button>
-          <button
-            type="button"
-            onClick={() => onDecision("deny")}
-            className="inline-flex items-center gap-2 rounded-xl border-2 border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 hover:border-red-300 focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition-colors"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Deny
-          </button>
-          <button
-            type="button"
-            onClick={() => onDecision("query")}
-            className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 hover:border-amber-300 focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 transition-colors"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Query
-          </button>
-          <button
-            type="button"
-            onClick={() => onDecision("conditional")}
-            className="inline-flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-300 focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 transition-colors"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Conditional approval
-          </button>
-        </div>
-      )}
+      {
+        decisionMade ? (
+          <div className="rounded-xl border-2 border-teal-300 bg-teal-50 p-5 text-center" >
+            <p className="font-semibold text-teal-900 capitalize">Decision: {decisionMade}</p>
+            <p className="text-sm text-teal-700 mt-1">
+              {decisionMade === "approve" && "Authorization number will be issued; validity 15 days."}
+              {decisionMade === "deny" && "Denial reason and appeal rights will be communicated."}
+              {decisionMade === "query" && "Specific queries sent to hospital; 7-day response deadline."}
+              {decisionMade === "conditional" && "Approval with conditions; hospital must confirm parameters."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => onDecision("approve")}
+              disabled={!canApprove}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecision("deny")}
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 hover:border-red-300 focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Deny
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecision("query")}
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 hover:border-amber-300 focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Query
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecision("conditional")}
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-300 focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Conditional approval
+            </button>
+          </div>
+        )}
 
-      {!canApprove && !decisionMade && (
-        <p className="text-xs text-amber-700">
-          Approve is disabled until documentation is complete and open queries are resolved. Use Query to request missing items.
-        </p>
-      )}
-    </div>
+      {
+        !canApprove && !decisionMade && (
+          <p className="text-xs text-amber-700">
+            Approve is disabled until documentation is complete and open queries are resolved. Use Query to request missing items.
+          </p>
+        )
+      }
+    </div >
   );
 }

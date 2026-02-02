@@ -9,13 +9,6 @@ const preAuthStatus: StatusMap = {
   rejected: { label: "Rejected", className: "bg-red-100 text-red-800" },
 };
 
-const complianceStatus: StatusMap = {
-  compliant: { label: "Compliant", className: "bg-emerald-100 text-emerald-800 border border-emerald-200" },
-  partial: { label: "Partial", className: "bg-amber-100 text-amber-800 border border-amber-200" },
-  non_compliant: { label: "Fraud Suspected", className: "bg-red-100 text-red-800 border border-red-200" },
-  pending_review: { label: "Pending review", className: "bg-slate-100 text-slate-700 border border-slate-200" },
-};
-
 const fraudSeverity: StatusMap = {
   high: { label: "High", className: "badge-high" },
   medium: { label: "Medium", className: "badge-medium" },
@@ -24,15 +17,6 @@ const fraudSeverity: StatusMap = {
 
 export function PreAuthStatusBadge({ status }: { status: string }) {
   const s = preAuthStatus[status] ?? { label: status, className: "bg-slate-100 text-slate-600" };
-  return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.className}`}>
-      {s.label}
-    </span>
-  );
-}
-
-export function ComplianceStatusBadge({ status }: { status: string }) {
-  const s = complianceStatus[status] ?? { label: status, className: "bg-slate-100 text-slate-600" };
   return (
     <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.className}`}>
       {s.label}

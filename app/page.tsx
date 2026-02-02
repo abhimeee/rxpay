@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   preAuthRequests,
-  complianceRules,
   fraudAlerts,
   formatCurrency,
   getHospital,
@@ -43,9 +42,6 @@ export default function DashboardPage() {
   const underReview = activeRequests.filter((p) => p.status === "under_review").length;
   const readyForDecision = activeRequests.filter((p) => p.aiReadinessScore >= 85).length;
 
-  // Compliance rules
-  const compliantRules = complianceRules.filter((r) => r.status === "compliant").length;
-  const totalRules = complianceRules.length;
 
   // Get recent pre-auth requests (top 5)
   const recentPreAuth = [...preAuthRequests]
@@ -77,10 +73,10 @@ export default function DashboardPage() {
       <div className="p-8 space-y-8">
         {/* Simple Health Status Banner */}
         <div className={`rounded-xl border px-4 py-3 flex items-center justify-between ${healthLabel === "All Systems Healthy"
-            ? "border-emerald-200 bg-emerald-50/50 text-emerald-800"
-            : healthLabel === "Attention Needed"
-              ? "border-amber-200 bg-amber-50/50 text-amber-800"
-              : "border-red-200 bg-red-50/50 text-red-800"
+          ? "border-emerald-200 bg-emerald-50/50 text-emerald-800"
+          : healthLabel === "Attention Needed"
+            ? "border-amber-200 bg-amber-50/50 text-amber-800"
+            : "border-red-200 bg-red-50/50 text-red-800"
           }`}>
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
             <span className={`h-2.5 w-2.5 rounded-full ${healthLabel === "All Systems Healthy" ? "bg-emerald-500" : healthLabel === "Attention Needed" ? "bg-amber-500" : "bg-red-500"
@@ -156,17 +152,6 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* Card 5: Compliance */}
-          <Link href="/compliance" className="rounded-xl border border-slate-200 bg-white p-6 transition-all hover:bg-slate-50 shadow-sm">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Compliance</p>
-              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <p className="mt-4 text-3xl font-bold text-slate-900">{compliantRules}/{totalRules}</p>
-            <p className="mt-4 text-xs font-medium text-emerald-600 uppercase tracking-wide">All rules active</p>
-          </Link>
 
           {/* Card 6: Throughput */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -295,7 +280,7 @@ export default function DashboardPage() {
         {/* Minimal AI capabilities row */}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-wrap gap-x-8 gap-y-3 justify-center">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] w-full text-center mb-1">AI-Augmented Core</p>
-          {["Completeness Checks", "Fraud Detection", "IRDAI Compliance", "SLA Monitoring", "Prioritization"].map(cap => (
+          {["Completeness Checks", "Fraud Detection", "SLA Monitoring", "Prioritization"].map(cap => (
             <div key={cap} className="flex items-center gap-1.5 grayscale opacity-60">
               <svg className="h-3 w-3 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
