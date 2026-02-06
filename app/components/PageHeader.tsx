@@ -55,6 +55,12 @@ export function PageHeader({
                 Pre-Auth Hub
               </Link>
               <Link
+                href="/reimbursements"
+                className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                Reimbursements
+              </Link>
+              <Link
                 href="/compliance"
                 className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
               >
