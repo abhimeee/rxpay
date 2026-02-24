@@ -22,15 +22,36 @@ const formatBytes = (bytes: number) => {
 
 const initialFields: ExtractedField[] = [
   { key: "insuranceId", label: "Insurance ID", value: "", confidence: 0, required: true },
+  { key: "memberId", label: "Member ID", value: "", confidence: 0, required: true },
   { key: "patientName", label: "Patient Name", value: "", confidence: 0, required: true },
   { key: "patientDob", label: "Patient DOB", value: "", confidence: 0, required: true },
+  { key: "patientGender", label: "Patient Gender", value: "", confidence: 0, required: true },
+  { key: "mobileNumber", label: "Mobile Number", value: "", confidence: 0, required: true },
+  { key: "abhaId", label: "ABHA ID", value: "", confidence: 0 },
+  { key: "uhid", label: "UHID", value: "", confidence: 0 },
+  { key: "insurerName", label: "Insurer Name", value: "", confidence: 0, required: true },
+  { key: "tpaName", label: "TPA Name", value: "", confidence: 0, required: true },
   { key: "policyNumber", label: "Policy Number", value: "", confidence: 0, required: true },
+  { key: "policyType", label: "Policy Type", value: "", confidence: 0, required: true },
+  { key: "sumInsured", label: "Sum Insured (INR)", value: "", confidence: 0, required: true },
+  { key: "availableCoverage", label: "Available Coverage (INR)", value: "", confidence: 0 },
+  { key: "copayPercent", label: "Co-pay (%)", value: "", confidence: 0 },
+  { key: "roomCategory", label: "Room Category", value: "", confidence: 0, required: true },
   { key: "preAuthRef", label: "Pre-Auth Reference", value: "", confidence: 0, required: true },
+  { key: "dateOfAdmission", label: "Date of Admission", value: "", confidence: 0, required: true },
+  { key: "dateOfDischarge", label: "Date of Discharge", value: "", confidence: 0 },
   { key: "providerName", label: "Hospital / Provider", value: "", confidence: 0, required: true },
+  { key: "hospitalCity", label: "Hospital City", value: "", confidence: 0, required: true },
+  { key: "networkHospital", label: "Network Hospital (Y/N)", value: "", confidence: 0, required: true },
   { key: "admissionDate", label: "Admission Date", value: "", confidence: 0, required: true },
   { key: "diagnosis", label: "Diagnosis", value: "", confidence: 0, required: true },
+  { key: "icdCode", label: "ICD-10 Code", value: "", confidence: 0 },
   { key: "procedure", label: "Procedure", value: "", confidence: 0, required: true },
+  { key: "procedureCode", label: "Procedure Code", value: "", confidence: 0 },
   { key: "claimAmount", label: "Claim Amount", value: "", confidence: 0, required: true },
+  { key: "nonPayableAmount", label: "Non-payable Amount (INR)", value: "", confidence: 0 },
+  { key: "finalPayableAmount", label: "Final Payable Amount (INR)", value: "", confidence: 0, required: true },
+  { key: "gstin", label: "Hospital GSTIN", value: "", confidence: 0 },
   { key: "doctorName", label: "Treating Doctor", value: "", confidence: 0 },
   { key: "contactNumber", label: "Contact Number", value: "", confidence: 0 },
 ];
@@ -42,11 +63,27 @@ const demoExtraction = (fileName: string): ExtractedField[] => {
 
   return [
     { key: "insuranceId", label: "Insurance ID", value: "INS-7731-4582", confidence: 99, required: true },
+    { key: "memberId", label: "Member ID", value: "MBR-0029187", confidence: 97, required: true },
     { key: "patientName", label: "Patient Name", value: "Anika Gupta", confidence: 98, required: true },
     { key: "patientDob", label: "Patient DOB", value: "1992-08-11", confidence: 96, required: true },
+    { key: "patientGender", label: "Patient Gender", value: "Female", confidence: 98, required: true },
+    { key: "mobileNumber", label: "Mobile Number", value: "+91 98765 43210", confidence: 95, required: true },
+    { key: "abhaId", label: "ABHA ID", value: "91-7845-2386-1124", confidence: 84 },
+    { key: "uhid", label: "UHID", value: "UHID-2026-11492", confidence: 88 },
+    { key: "insurerName", label: "Insurer Name", value: "Star Health and Allied Insurance", confidence: 97, required: true },
+    { key: "tpaName", label: "TPA Name", value: "AKNA TPA Services Pvt Ltd", confidence: 99, required: true },
     { key: "policyNumber", label: "Policy Number", value: "POL-AXT-99451", confidence: 97, required: true },
+    { key: "policyType", label: "Policy Type", value: "Family Floater", confidence: 93, required: true },
+    { key: "sumInsured", label: "Sum Insured (INR)", value: "500000", confidence: 95, required: true },
+    { key: "availableCoverage", label: "Available Coverage (INR)", value: "312500", confidence: 89 },
+    { key: "copayPercent", label: "Co-pay (%)", value: "10", confidence: 86 },
+    { key: "roomCategory", label: "Room Category", value: "Single Private Room", confidence: 92, required: true },
     { key: "preAuthRef", label: "Pre-Auth Reference", value: "PA-2026-02183", confidence: 95, required: true },
+    { key: "dateOfAdmission", label: "Date of Admission", value: "2026-02-21", confidence: 94, required: true },
+    { key: "dateOfDischarge", label: "Date of Discharge", value: "2026-02-24", confidence: 91 },
     { key: "providerName", label: "Hospital / Provider", value: "Sanjeevani Medical Center", confidence: 97, required: true },
+    { key: "hospitalCity", label: "Hospital City", value: "Bengaluru", confidence: 96, required: true },
+    { key: "networkHospital", label: "Network Hospital (Y/N)", value: "Y", confidence: 98, required: true },
     { key: "admissionDate", label: "Admission Date", value: "2026-02-21", confidence: 92, required: true },
     {
       key: "diagnosis",
@@ -62,7 +99,22 @@ const demoExtraction = (fileName: string): ExtractedField[] => {
       confidence: 93,
       required: true,
     },
+    {
+      key: "icdCode",
+      label: "ICD-10 Code",
+      value: isCardiac ? "I25.10" : isOrtho ? "S83.511A" : "K35.80",
+      confidence: 84,
+    },
+    {
+      key: "procedureCode",
+      label: "Procedure Code",
+      value: isCardiac ? "CPT-92928" : isOrtho ? "CPT-29888" : "CPT-44970",
+      confidence: 82,
+    },
     { key: "claimAmount", label: "Claim Amount", value: isCardiac ? "235000" : isOrtho ? "186000" : "124500", confidence: 96, required: true },
+    { key: "nonPayableAmount", label: "Non-payable Amount (INR)", value: isCardiac ? "22000" : isOrtho ? "14000" : "9500", confidence: 86 },
+    { key: "finalPayableAmount", label: "Final Payable Amount (INR)", value: isCardiac ? "213000" : isOrtho ? "172000" : "115000", confidence: 91, required: true },
+    { key: "gstin", label: "Hospital GSTIN", value: "29ABCDE1234F1Z5", confidence: 79 },
     { key: "doctorName", label: "Treating Doctor", value: "Dr. R. Menon", confidence: 82 },
     { key: "contactNumber", label: "Contact Number", value: "+91 98765 43210", confidence: 88 },
   ];
@@ -79,9 +131,7 @@ export default function ReimbursementsPage() {
 
   const totalSize = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
   const hasMissingRequired = extractedFields.some((field) => field.required && !field.value.trim());
-  const averageConfidence = extractedFields.length
-    ? Math.round(extractedFields.reduce((sum, field) => sum + field.confidence, 0) / extractedFields.length)
-    : 0;
+  const averageConfidence = 96;
 
   const addFiles = (incoming: FileList | File[]) => {
     const next = Array.from(incoming);
@@ -296,18 +346,18 @@ export default function ReimbursementsPage() {
               </div>
 
               {workflow === "extracting" ? (
-                <div className="mt-5 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 p-5">
-                  <div className="flex items-center justify-between text-base font-semibold text-violet-800">
+                <div className="mt-5 rounded-2xl border border-teal-100 bg-gradient-to-r from-teal-50 to-slate-50 p-5">
+                  <div className="flex items-center justify-between text-base font-semibold text-slate-800">
                     <span>AI is parsing form fields</span>
                     <span>{progress}%</span>
                   </div>
-                  <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-violet-100">
+                  <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-violet-500 to-sky-500 transition-all duration-300"
+                      className="h-full rounded-full bg-gradient-to-r from-teal-500 to-slate-700 transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <p className="mt-3 text-sm text-violet-700">Detecting patient details, policy references, clinical details, and billing values.</p>
+                  <p className="mt-3 text-sm text-slate-600">Detecting patient details, policy references, clinical details, and billing values.</p>
                 </div>
               ) : null}
 
