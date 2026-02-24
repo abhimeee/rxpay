@@ -19,7 +19,7 @@ export function PageHeader({
           <Link href="/" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm hover:border-teal-500/30 hover:shadow-md transition-all group">
             <Image src="/logo/rxpay.png" alt="RxPay" width={96} height={40} className="h-9 w-auto" />
             <span className="h-7 w-px bg-slate-200 group-hover:bg-teal-200 transition-colors" aria-hidden="true" />
-            <Image src="/logo/akna.jpeg" alt={`${currentTpa.name} logo`} width={96} height={40} className="h-9 w-auto" />
+            <Image src="/logo/akna.png" alt={`${currentTpa.name} logo`} width={96} height={40} className="h-9 w-auto" />
           </Link>
           <div>
             <p className="mt-1 text-base font-semibold tracking-wide text-slate-600 md:text-lg">
