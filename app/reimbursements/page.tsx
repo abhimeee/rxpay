@@ -131,7 +131,6 @@ export default function ReimbursementsPage() {
 
   const totalSize = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
   const hasMissingRequired = extractedFields.some((field) => field.required && !field.value.trim());
-  const averageConfidence = 96;
 
   const addFiles = (incoming: FileList | File[]) => {
     const next = Array.from(incoming);
@@ -161,17 +160,17 @@ export default function ReimbursementsPage() {
     setProgress(8);
     setSubmitMessage("");
 
-    const progressSteps = [18, 33, 48, 63, 77, 91, 100];
+    const progressSteps = [14, 26, 39, 53, 68, 82, 93, 100];
     progressSteps.forEach((value, index) => {
       setTimeout(() => {
         setProgress(value);
-      }, 300 + index * 330);
+      }, 500 + index * 520);
     });
 
     setTimeout(() => {
       setExtractedFields(demoExtraction(files[0].name));
       setWorkflow("review");
-    }, 300 + progressSteps.length * 330 + 250);
+    }, 500 + progressSteps.length * 520 + 450);
   };
 
   const updateField = (key: string, value: string) => {
@@ -363,16 +362,6 @@ export default function ReimbursementsPage() {
 
               {(workflow === "review" || workflow === "submitting" || workflow === "submitted") && (
                 <div className="mt-5">
-                  <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Extraction quality</p>
-                      <p className="text-base font-semibold text-slate-700">Average confidence: {averageConfidence}%</p>
-                    </div>
-                    <p className="text-sm text-slate-500">
-                      {hasMissingRequired ? "Missing required fields" : "All required fields present"}
-                    </p>
-                  </div>
-
                   <div className="grid gap-3 sm:grid-cols-2">
                     {extractedFields.map((field) => (
                       <label key={field.key} className="rounded-xl border border-slate-100 bg-white p-3">
