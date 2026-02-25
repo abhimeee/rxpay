@@ -13,6 +13,17 @@ type ExtractedField = {
   required?: boolean;
 };
 
+type UploadApiResponse = {
+  ok: boolean;
+  error?: string;
+  transcriptions?: Array<{
+    filename: string;
+    text: string;
+    summary: string;
+    source: string;
+  }>;
+};
+
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
@@ -120,6 +131,85 @@ const demoExtraction = (fileName: string): ExtractedField[] => {
   ];
 };
 
+const extractMatch = (text: string, patterns: RegExp[]) => {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const value = match?.[1]?.trim();
+    if (value) return value;
+  }
+  return "";
+};
+
+const toIsoDate = (raw: string) => {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const slashOrDash = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (!slashOrDash) return value;
+  const day = slashOrDash[1].padStart(2, "0");
+  const month = slashOrDash[2].padStart(2, "0");
+  const year = slashOrDash[3].length === 2 ? `20${slashOrDash[3]}` : slashOrDash[3];
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeAmount = (raw: string) => raw.replace(/[,\s]|INR|Rs\.?/gi, "").trim();
+
+const parseSimpleDocumentFields = (text: string) => {
+  const compact = text.replace(/\r/g, "");
+  return {
+    insuranceId: extractMatch(compact, [/(?:insurance\s*id)\s*[:\-]\s*([A-Z0-9\-\/]+)/i]),
+    memberId: extractMatch(compact, [/(?:member\s*id)\s*[:\-]\s*([A-Z0-9\-\/]+)/i]),
+    patientName: extractMatch(compact, [/(?:patient\s*name)\s*[:\-]\s*([A-Za-z .]+)/i]),
+    patientDob: toIsoDate(extractMatch(compact, [/(?:dob|date\s*of\s*birth)\s*[:\-]\s*([0-9][0-9\/-]+)/i])),
+    patientGender: extractMatch(compact, [/(?:gender|sex)\s*[:\-]\s*(male|female|other)/i]),
+    mobileNumber: extractMatch(compact, [/(?:mobile|phone|contact)\s*(?:number)?\s*[:\-]\s*([\+]?[0-9][0-9\s-]{8,})/i]),
+    abhaId: extractMatch(compact, [/(?:abha\s*id)\s*[:\-]\s*([0-9\-]+)/i]),
+    uhid: extractMatch(compact, [/(?:uhid)\s*[:\-]\s*([A-Z0-9\-\/]+)/i]),
+    insurerName: extractMatch(compact, [/(?:insurer\s*name|insurance\s*company)\s*[:\-]\s*([^\n]+)/i]),
+    tpaName: extractMatch(compact, [/(?:tpa\s*name)\s*[:\-]\s*([^\n]+)/i]),
+    policyNumber: extractMatch(compact, [/(?:policy\s*(?:number|no\.?))\s*[:\-]\s*([A-Z0-9\-\/]+)/i]),
+    policyType: extractMatch(compact, [/(?:policy\s*type)\s*[:\-]\s*([^\n]+)/i]),
+    sumInsured: normalizeAmount(extractMatch(compact, [/(?:sum\s*insured)\s*[:\-]\s*([0-9,.\sINRrs]+)/i])),
+    availableCoverage: normalizeAmount(extractMatch(compact, [/(?:available\s*(?:coverage|balance))\s*[:\-]\s*([0-9,.\sINRrs]+)/i])),
+    copayPercent: extractMatch(compact, [/(?:co[-\s]?pay)\s*[:\-]\s*([0-9]{1,2})\s*%?/i]),
+    roomCategory: extractMatch(compact, [/(?:room\s*category)\s*[:\-]\s*([^\n]+)/i]),
+    preAuthRef: extractMatch(compact, [/(?:pre[-\s]?auth(?:orization)?\s*(?:reference|ref|no\.?))\s*[:\-]\s*([A-Z0-9\-\/]+)/i]),
+    dateOfAdmission: toIsoDate(extractMatch(compact, [/(?:date\s*of\s*admission|admission\s*date)\s*[:\-]\s*([0-9][0-9\/-]+)/i])),
+    dateOfDischarge: toIsoDate(extractMatch(compact, [/(?:date\s*of\s*discharge|discharge\s*date)\s*[:\-]\s*([0-9][0-9\/-]+)/i])),
+    providerName: extractMatch(compact, [/(?:hospital|provider)\s*name\s*[:\-]\s*([^\n]+)/i]),
+    hospitalCity: extractMatch(compact, [/(?:hospital\s*city|city)\s*[:\-]\s*([A-Za-z .]+)/i]),
+    networkHospital: extractMatch(compact, [/(?:network\s*hospital)\s*[:\-]\s*(yes|no|y|n)/i]).toUpperCase(),
+    admissionDate: toIsoDate(extractMatch(compact, [/(?:admission\s*date)\s*[:\-]\s*([0-9][0-9\/-]+)/i])),
+    diagnosis: extractMatch(compact, [/(?:diagnosis)\s*[:\-]\s*([^\n]+)/i]),
+    icdCode: extractMatch(compact, [/(?:icd(?:-10)?\s*code)\s*[:\-]\s*([A-Z0-9.]+)/i]),
+    procedure: extractMatch(compact, [/(?:procedure)\s*[:\-]\s*([^\n]+)/i]),
+    procedureCode: extractMatch(compact, [/(?:procedure\s*code|cpt)\s*[:\-]\s*([A-Z0-9\-]+)/i]),
+    claimAmount: normalizeAmount(extractMatch(compact, [/(?:claim\s*amount)\s*[:\-]\s*([0-9,.\sINRrs]+)/i])),
+    nonPayableAmount: normalizeAmount(extractMatch(compact, [/(?:non[-\s]?payable\s*amount)\s*[:\-]\s*([0-9,.\sINRrs]+)/i])),
+    finalPayableAmount: normalizeAmount(extractMatch(compact, [/(?:final\s*payable\s*amount|payable\s*amount)\s*[:\-]\s*([0-9,.\sINRrs]+)/i])),
+    gstin: extractMatch(compact, [/(?:gstin)\s*[:\-]\s*([0-9A-Z]{15})/i]),
+    doctorName: extractMatch(compact, [/(?:doctor|treating\s*doctor)\s*[:\-]\s*([^\n]+)/i]),
+    contactNumber: extractMatch(compact, [/(?:contact\s*number|phone)\s*[:\-]\s*([\+]?[0-9][0-9\s-]{8,})/i]),
+  };
+};
+
+const toFieldsFromParsedText = (text: string, fallbackFileName: string) => {
+  const parsed = parseSimpleDocumentFields(text);
+  const matchedCount = Object.values(parsed).filter((value) => value.trim().length > 0).length;
+  if (matchedCount < 3) {
+    return demoExtraction(fallbackFileName);
+  }
+
+  return initialFields.map((field) => {
+    const parsedValue = parsed[field.key as keyof typeof parsed] || "";
+    return {
+      ...field,
+      value: parsedValue,
+      confidence: parsedValue ? 90 : 0,
+    };
+  });
+};
+
 export default function ReimbursementsPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -153,24 +243,49 @@ export default function ReimbursementsPage() {
     setFiles((current) => current.filter((_, idx) => idx !== index));
   };
 
-  const handleExtract = () => {
+  const handleExtract = async () => {
     if (!files.length) return;
 
     setWorkflow("extracting");
     setProgress(8);
     setSubmitMessage("");
 
-    const progressSteps = [14, 26, 39, 53, 68, 82, 93, 100];
-    progressSteps.forEach((value, index) => {
-      setTimeout(() => {
-        setProgress(value);
-      }, 500 + index * 520);
-    });
+    let currentProgress = 8;
+    const progressTimer = setInterval(() => {
+      currentProgress = Math.min(currentProgress + 7, 92);
+      setProgress(currentProgress);
+    }, 350);
 
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+
+      const response = await fetch("/api/reimbursements/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await response.json()) as UploadApiResponse;
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Failed to parse documents.");
+      }
+
+      const mergedText = (data.transcriptions || [])
+        .map((item) => item.text || "")
+        .join("\n\n")
+        .trim();
+
+      setExtractedFields(toFieldsFromParsedText(mergedText, files[0].name));
+      setProgress(100);
+      setWorkflow("review");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to parse documents.";
+      setSubmitMessage(message);
       setExtractedFields(demoExtraction(files[0].name));
       setWorkflow("review");
-    }, 500 + progressSteps.length * 520 + 450);
+    } finally {
+      clearInterval(progressTimer);
+    }
   };
 
   const updateField = (key: string, value: string) => {

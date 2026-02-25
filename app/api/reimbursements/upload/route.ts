@@ -1,4 +1,15 @@
 import { NextResponse } from "next/server";
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import {
+  DetectDocumentTextCommand,
+  GetDocumentTextDetectionCommand,
+  StartDocumentTextDetectionCommand,
+  TextractClient,
+} from "@aws-sdk/client-textract";
 
 const getSource = (file: File) => {
   if (file.type === "application/pdf") return "pdf";
@@ -13,71 +24,208 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 };
 
-const getAnthropicConfig = () => {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-  const model = process.env.ANTHROPIC_MODEL?.trim() || "claude-3-5-haiku-20241022";
-  return { apiKey, model };
+const getAwsConfig = () => {
+  const region = process.env.AWS_REGION?.trim();
+  const bucket = process.env.AWS_S3_BUCKET?.trim();
+  return { region, bucket };
 };
 
-const parseJsonPayload = (text: string) => {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-  try {
-    return JSON.parse(text.slice(start, end + 1)) as { transcript?: string; summary?: string };
-  } catch {
-    return null;
-  }
+const buildSimpleSummary = (text: string) => {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 4);
+
+  if (!lines.length) return "No summary available.";
+
+  const summary = lines.slice(0, 3).join(" ").slice(0, 420).trim();
+  return summary || "No summary available.";
 };
 
-const callAnthropic = async (payload: Record<string, unknown>) => {
-  const { apiKey } = getAnthropicConfig();
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(payload),
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Anthropic request failed.");
-  }
+const isImageForTextract = (mimeType: string) =>
+  mimeType === "image/jpeg" || mimeType === "image/png";
 
-  return (await response.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-  };
+const linesFromTextractBlocks = (
+  blocks?: Array<{ BlockType?: string; Text?: string }>
+) =>
+  (blocks || [])
+    .filter((block) => block.BlockType === "LINE" && !!block.Text?.trim())
+    .map((block) => block.Text!.trim())
+    .join("\n")
+    .trim();
+
+const extractImageTextWithTextract = async (buffer: Buffer, mimeType: string) => {
+  const { region } = getAwsConfig();
+  if (!region || !isImageForTextract(mimeType)) return "";
+
+  try {
+    const textract = new TextractClient({ region });
+    const result = await textract.send(
+      new DetectDocumentTextCommand({
+        Document: { Bytes: new Uint8Array(buffer) },
+      })
+    );
+    return linesFromTextractBlocks(result.Blocks as Array<{ BlockType?: string; Text?: string }>) || "";
+  } catch {
+    return "";
+  }
 };
 
-const buildTextPrompt = (text: string) => `
-You are an expert claims intake analyst. Return a strict JSON object with keys:
-- "transcript": cleaned, readable text from the document
-- "summary": 2-4 concise sentences that highlight the key medical, billing, and policy-relevant details
+const extractPdfTextWithTextract = async (buffer: Buffer, fileName: string) => {
+  const { region, bucket } = getAwsConfig();
+  if (!region || !bucket) {
+    console.warn("[reimbursements][pdf-textract] Missing AWS config", {
+      hasRegion: Boolean(region),
+      hasBucket: Boolean(bucket),
+      fileName,
+    });
+    return "";
+  }
 
-If the document has no readable text, set transcript to "No readable text extracted." and summary to "No summary available."
+  const s3 = new S3Client({ region });
+  const textract = new TextractClient({ region });
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const key = `reimbursements/textract-temp/${Date.now()}-${safeName}`;
+  console.info("[reimbursements][pdf-textract] Starting extraction", {
+    fileName,
+    bytes: buffer.length,
+    region,
+    bucket,
+    key,
+  });
 
-Document text:
-${text}
-`;
+  try {
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: "application/pdf",
+      })
+    );
+    console.info("[reimbursements][pdf-textract] Uploaded PDF to S3 temp key", {
+      fileName,
+      key,
+    });
 
-const buildVisionPrompt = () => `
-You are an expert claims intake analyst. Extract the readable text from this medical document image, then summarize it.
-Return a strict JSON object with keys:
-- "transcript": the extracted text
-- "summary": 2-4 concise sentences highlighting key medical, billing, and policy-relevant details
+    const started = await textract.send(
+      new StartDocumentTextDetectionCommand({
+        DocumentLocation: {
+          S3Object: {
+            Bucket: bucket,
+            Name: key,
+          },
+        },
+      })
+    );
 
-If no readable text is present, set transcript to "No readable text extracted." and summary to "No summary available."
-`;
+    const jobId = started.JobId;
+    if (!jobId) {
+      console.warn("[reimbursements][pdf-textract] StartDocumentTextDetection returned no JobId", {
+        fileName,
+        key,
+      });
+      return "";
+    }
+    console.info("[reimbursements][pdf-textract] Textract job started", {
+      fileName,
+      key,
+      jobId,
+    });
+
+    let status = "IN_PROGRESS";
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await sleep(1500);
+      const polled = await textract.send(
+        new GetDocumentTextDetectionCommand({
+          JobId: jobId,
+          MaxResults: 1000,
+        })
+      );
+      status = polled.JobStatus || "IN_PROGRESS";
+      console.info("[reimbursements][pdf-textract] Poll status", {
+        fileName,
+        jobId,
+        attempt: attempt + 1,
+        status,
+      });
+      if (status === "SUCCEEDED") {
+        let lines = linesFromTextractBlocks(polled.Blocks as Array<{ BlockType?: string; Text?: string }>);
+        let nextToken = polled.NextToken;
+
+        while (nextToken) {
+          const page = await textract.send(
+            new GetDocumentTextDetectionCommand({
+              JobId: jobId,
+              MaxResults: 1000,
+              NextToken: nextToken,
+            })
+          );
+          const pageLines = linesFromTextractBlocks(page.Blocks as Array<{ BlockType?: string; Text?: string }>);
+          lines = [lines, pageLines].filter(Boolean).join("\n").trim();
+          nextToken = page.NextToken;
+        }
+
+        console.info("[reimbursements][pdf-textract] Extraction succeeded", {
+          fileName,
+          jobId,
+          lineCount: lines ? lines.split("\n").length : 0,
+          charCount: lines.length,
+        });
+        return lines;
+      }
+
+      if (status === "FAILED" || status === "PARTIAL_SUCCESS") {
+        console.warn("[reimbursements][pdf-textract] Extraction failed", {
+          fileName,
+          jobId,
+          status,
+        });
+        return "";
+      }
+    }
+
+    console.warn("[reimbursements][pdf-textract] Extraction timed out waiting for completion", {
+      fileName,
+      jobId,
+      maxAttempts: 20,
+    });
+    return "";
+  } catch (error) {
+    console.error("[reimbursements][pdf-textract] Unexpected extraction error", {
+      fileName,
+      key,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return "";
+  } finally {
+    try {
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        })
+      );
+      console.info("[reimbursements][pdf-textract] Cleaned up S3 temp key", {
+        fileName,
+        key,
+      });
+    } catch (error) {
+      console.warn("[reimbursements][pdf-textract] Failed to cleanup S3 temp key", {
+        fileName,
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+};
 
 const analyzeDocument = async (file: File) => {
-  const { model } = getAnthropicConfig();
   const source = getSource(file);
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -91,77 +239,38 @@ const analyzeDocument = async (file: File) => {
   }
 
   if (source === "pdf") {
-    // Use Anthropic's native PDF support via document source
-    const payload = {
-      model,
-      max_tokens: 1024,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: buffer.toString("base64"),
-              },
-            },
-            {
-              type: "text",
-              text: buildTextPrompt("Please extract and summarize the document above."),
-            },
-          ],
-        },
-      ],
-    };
-
-    const result = await callAnthropic(payload);
-    const text = result.content?.find((item) => item.type === "text")?.text ?? "";
-    const parsedJson = parseJsonPayload(text);
+    const textractText = await extractPdfTextWithTextract(buffer, file.name);
+    if (textractText) {
+      return {
+        filename: file.name,
+        text: textractText,
+        summary: buildSimpleSummary(textractText),
+        source,
+      } as const;
+    }
 
     return {
       filename: file.name,
-      text: parsedJson?.transcript || "No readable text extracted.",
-      summary: parsedJson?.summary || "No summary available.",
+      text: "No readable text extracted.",
+      summary: "No summary available.",
       source,
     } as const;
   }
 
-  const payload = {
-    model,
-    max_tokens: 800,
-    temperature: 0.2,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: file.type || "image/jpeg",
-              data: buffer.toString("base64"),
-            },
-          },
-          {
-            type: "text",
-            text: buildVisionPrompt(),
-          },
-        ],
-      },
-    ],
-  };
-
-  const result = await callAnthropic(payload);
-  const text = result.content?.find((item) => item.type === "text")?.text ?? "";
-  const parsedJson = parseJsonPayload(text);
+  const textractText = await extractImageTextWithTextract(buffer, file.type || "image/jpeg");
+  if (textractText) {
+    return {
+      filename: file.name,
+      text: textractText,
+      summary: buildSimpleSummary(textractText),
+      source,
+    } as const;
+  }
 
   return {
     filename: file.name,
-    text: parsedJson?.transcript || "No readable text extracted.",
-    summary: parsedJson?.summary || "No summary available.",
+    text: "No readable text extracted.",
+    summary: "No summary available.",
     source,
   } as const;
 };
