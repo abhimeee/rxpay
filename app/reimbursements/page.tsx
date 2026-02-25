@@ -20,6 +20,24 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 };
 
+const getConfidenceTone = (confidence: number) => {
+  if (confidence >= 90) {
+    return {
+      row: "border-green-200 bg-green-50/80",
+    };
+  }
+
+  if (confidence >= 80) {
+    return {
+      row: "border-amber-200 bg-amber-50/80",
+    };
+  }
+
+  return {
+    row: "border-red-200 bg-red-50/80",
+  };
+};
+
 const initialFields: ExtractedField[] = [
   { key: "insuranceId", label: "Insurance ID", value: "", confidence: 0, required: true },
   { key: "memberId", label: "Member ID", value: "", confidence: 0, required: true },
@@ -363,19 +381,23 @@ export default function ReimbursementsPage() {
               {(workflow === "review" || workflow === "submitting" || workflow === "submitted") && (
                 <div className="mt-5">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {extractedFields.map((field) => (
-                      <label key={field.key} className="rounded-xl border border-slate-100 bg-white p-3">
-                        <div className="mb-2">
-                          <span className="text-sm font-bold uppercase tracking-wide text-slate-500">{field.label}</span>
-                        </div>
-                        <input
-                          value={field.value}
-                          onChange={(event) => updateField(field.key, event.target.value)}
-                          placeholder={`Enter ${field.label.toLowerCase()}`}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-700 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                        />
-                      </label>
-                    ))}
+                    {extractedFields.map((field) => {
+                      const confidenceTone = getConfidenceTone(field.confidence);
+
+                      return (
+                        <label key={field.key} className={`rounded-xl border p-3 ${confidenceTone.row}`}>
+                          <div className="mb-2">
+                            <span className="text-sm font-bold uppercase tracking-wide text-slate-600">{field.label}</span>
+                          </div>
+                          <input
+                            value={field.value}
+                            onChange={(event) => updateField(field.key, event.target.value)}
+                            placeholder={`Enter ${field.label.toLowerCase()}`}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-700 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                          />
+                        </label>
+                      );
+                    })}
                   </div>
 
                   <label className="mt-4 block text-base font-semibold text-slate-600">
