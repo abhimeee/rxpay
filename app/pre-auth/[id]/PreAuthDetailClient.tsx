@@ -36,6 +36,7 @@ interface DocOverlayState {
     docId?: string;
     aiSuggestion?: string;
     docType?: string;
+    pdfUrl?: string; // When set, shows actual PDF on left instead of text rendering
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -210,7 +211,46 @@ function DocumentViewerOverlay({
 
                 {/* Body: left doc + right panel */}
                 <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-                    {/* Left: Document content */}
+                    {/* Left: Document content — PDF iframe or text rendering */}
+                    {overlay.pdfUrl ? (
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: "1px solid var(--color-border)", overflow: "hidden" }}>
+                            {/* PDF header strip */}
+                            <div style={{
+                                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between",
+                                padding: "8px 16px", borderBottom: "1px solid var(--color-border)", background: "var(--color-bg)",
+                            }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: "var(--color-text-muted)", flexShrink: 0 }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-primary)" }}>Source Document</span>
+                                    <span style={{
+                                        fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
+                                        padding: "1px 7px", borderRadius: 3,
+                                        background: "#EFF6FF", color: "#1D4ED8",
+                                        border: "1px solid #BFDBFE",
+                                    }}>casefile.pdf</span>
+                                </div>
+                                <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--color-text-muted)", alignItems: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                        <span style={{ width: 10, height: 10, background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 2, display: "inline-block" }} />
+                                        Verified field
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                        <span style={{ width: 10, height: 10, background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 2, display: "inline-block" }} />
+                                        AI-flagged issue
+                                    </div>
+                                    <span style={{ color: "var(--color-text-muted)", fontSize: 10 }}>(see extracted fields →)</span>
+                                </div>
+                            </div>
+                            {/* Actual PDF iframe */}
+                            <iframe
+                                src={overlay.pdfUrl}
+                                style={{ flex: 1, width: "100%", border: "none" }}
+                                title={overlay.title}
+                            />
+                        </div>
+                    ) : (
                     <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px", borderRight: "1px solid var(--color-border)", background: "#FAFAFA" }}>
                         {/* Highlight legend */}
                         <div style={{ display: "flex", gap: 16, marginBottom: 20, fontSize: 11, color: "var(--color-text-muted)" }}>
@@ -260,6 +300,7 @@ function DocumentViewerOverlay({
                             })}
                         </div>
                     </div>
+                    )}
 
                     {/* Right: Summary + Chat tabs */}
                     <div style={{ width: 340, flexShrink: 0, display: "flex", flexDirection: "column", background: "var(--color-white)" }}>
@@ -808,6 +849,27 @@ export function PreAuthDetailClient({
             sumInsured: holder?.sumInsured,
             ...context,
         });
+
+        // For the Ramesh Kumar demo case (PA022), show the actual casefile PDF on the left.
+        // Map document type / item label to the most relevant page.
+        let pdfUrl: string | undefined;
+        if (pa.id === "PA022") {
+            const label = (item?.label ?? "").toLowerCase();
+            if (/aadhaar|id proof|policy|e-card|cashless|tpa|consent/.test(label)) {
+                pdfUrl = "/casefile.pdf#page=1";
+            } else if (/doctor|clinical|diagnosis|examination|recommendation|nephrology/.test(label)) {
+                pdfUrl = "/casefile.pdf#page=2";
+            } else if (/cost|breakdown|investigation|medicine|room|admission/.test(label)) {
+                pdfUrl = "/casefile.pdf#page=3";
+            } else if (type === "Medical Coding" || type === "Medical Necessity") {
+                pdfUrl = "/casefile.pdf#page=2";
+            } else if (type === "Fraud & Anomaly") {
+                pdfUrl = "/casefile.pdf#page=1";
+            } else {
+                pdfUrl = "/casefile.pdf";
+            }
+        }
+
         setDocOverlay({
             isOpen: true,
             title,
@@ -815,6 +877,7 @@ export function PreAuthDetailClient({
             docId: item?.id,
             aiSuggestion: item?.aiSuggestion,
             docType: type,
+            pdfUrl,
         });
     }, [holder, insurer, hospital, pa]);
 

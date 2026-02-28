@@ -18,6 +18,7 @@ export const hospitals: Hospital[] = [
   { id: "H004", name: "Manipal Hospitals, Bangalore", city: "Bangalore", state: "Karnataka", empanelmentStatus: "active", tier: "1" },
   { id: "H005", name: "Medanta - The Medicity", city: "Gurgaon", state: "Haryana", empanelmentStatus: "active", tier: "1" },
   { id: "H006", name: "Lilavati Hospital, Mumbai", city: "Mumbai", state: "Maharashtra", empanelmentStatus: "active", tier: "1" },
+  { id: "H007", name: "Sri Laxmi Multispeciality Hospital, Hyderabad", city: "Hyderabad", state: "Telangana", empanelmentStatus: "under_review", tier: "2" },
 ];
 
 export const insurers: Insurer[] = [
@@ -55,6 +56,7 @@ export const policyHolders: PolicyHolder[] = [
   { id: "P018", name: "Sunita Williams", policyNumber: "STAR/HL/2024/776655", insurerId: "I001", sumInsured: 2000000, relationship: "self" },
   { id: "P019", name: "Rajat Sharma", policyNumber: "HDFC/HL/2023/112233", insurerId: "I002", sumInsured: 500000, relationship: "self" },
   { id: "P020", name: "Lakshmi Iyer", policyNumber: "ICICI/HL/2024/554433", insurerId: "I003", sumInsured: 1000000, relationship: "self" },
+  { id: "P021", name: "Mr. Ramesh Kumar", policyNumber: "POL-STAR-IND-2025-009871", insurerId: "I001", sumInsured: 500000, relationship: "self" },
 ];
 
 // Hardcoded relative durations (in minutes) to ensure diversity
@@ -79,6 +81,7 @@ const durations: Record<string, number> = {
   PA018: 180,
   PA019: 300,
   PA020: 600,
+  PA022: 90,
 };
 
 const now = new Date();
@@ -608,6 +611,33 @@ export const preAuthRequests: PreAuthRequest[] = [
       { id: "c6", label: "Policy copy", status: "submitted", value: "Verified" },
       { id: "c7", label: "ID proof", status: "submitted", value: "Verified" },
       { id: "c8", label: "Exclusion policy verify", status: "submitted", value: "Dental exclusion clause G.4.2 active" },
+    ],
+  },
+  {
+    id: "PA022",
+    claimId: "CLM/2026/022/STAR",
+    hospitalId: "H007",
+    policyHolderId: "P021",
+    insurerId: "I001",
+    assigneeId: "A003",
+    status: "awaiting_docs",
+    estimatedAmount: 165000,
+    procedure: "Wound Debridement + Right Toe Amputation",
+    diagnosis: "Diabetic Foot Infection with Gangrene",
+    icdCode: "E11.52, A41.9, N18.3",
+    submittedAt: "2026-02-14T07:58:00Z",
+    slaDeadline: new Date(now.getTime() + durations["PA022"] * 60000).toISOString(),
+    aiReadinessScore: 85,
+    missingCritical: ["Previous diabetic treatment summary (pre-existing condition record)"],
+    checklist: [
+      { id: "c1", label: "Cashless pre-auth request form (Form A)", status: "approved", value: "Uploaded — 14/02/2026, 07:55 AM" },
+      { id: "c2", label: "Policy copy / e-card", status: "approved", value: "POL-STAR-IND-2025-009871 — active, verified" },
+      { id: "c3", label: "ID proof (Aadhaar)", status: "approved", value: "XXXX-XXXX-7682 — linked and verified" },
+      { id: "c4", label: "Doctor's recommendation (Dr. S. Harinath)", status: "approved", value: "Attached with surgeon stamp, 14/02/2026" },
+      { id: "c5", label: "Clinical examination notes", status: "approved", value: "Fever 101.4°F; necrotic ulcer, right toe; sepsis workup initiated" },
+      { id: "c6", label: "Estimated cost breakdown (itemised)", status: "approved", value: "₹1,65,000 — OT ₹55K, Medicines ₹35K, Investigations ₹18K, Room ₹6.5K" },
+      { id: "c7", label: "Consent form with patient signature", status: "approved", value: "Received — patient and relative signature on file" },
+      { id: "c8", label: "Previous diabetic treatment summary", status: "missing", aiSuggestion: "Diabetes listed since 2014. A brief GP/physician summary of prior management would complete the pre-existing condition record and support the emergency exception clause." },
     ],
   },
 ];
