@@ -8,6 +8,8 @@ import type {
   SectionStatus,
   UiTab,
   CrossTabQuery,
+  AlternativeTreatment,
+  CodingItem,
 } from "@/lib/types";
 import { formatCurrency } from "@/lib/data";
 import { getWorkflowData } from "@/lib/workflow-data";
@@ -295,6 +297,7 @@ export function PreAuthWorkflow({
               p2pSummary={localWorkflowData.p2pSummary}
               onViewDoc={(item) => onOpenDoc("Medical Necessity", item)}
               onStatusChange={updateMedicalNecessityStatus}
+              alternativeTreatments={localWorkflowData.alternativeTreatments}
             />
           ) : <EmptyState />}
           <RaiseQuerySection
@@ -371,11 +374,16 @@ function CodingContent({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ code: string; description: string }>({ code: "", description: "" });
   const [editedItems, setEditedItems] = useState<Record<string, { code: string; description: string }>>({});
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [addedIcd10, setAddedIcd10] = useState<CodingItem[]>([]);
+  const [addedCpt, setAddedCpt] = useState<CodingItem[]>([]);
+  const [addingType, setAddingType] = useState<"icd10" | "cpt" | null>(null);
+  const [addDraft, setAddDraft] = useState({ code: "", description: "" });
 
-  const allItems = [...coding.icd10, ...coding.cpt];
   const setVerdict = (id: string, v: string) => setCodingVerdicts((prev) => ({ ...prev, [id]: v }));
+  const deleteItem = (id: string) => setDeletedIds((prev) => new Set([...prev, id]));
 
-  const startEdit = (item: typeof allItems[number]) => {
+  const startEdit = (item: CodingItem) => {
     const ov = editedItems[item.id];
     setEditingId(item.id);
     setEditDraft({ code: ov?.code ?? item.code, description: ov?.description ?? item.description });
@@ -387,15 +395,36 @@ function CodingContent({
   };
   const cancelEdit = () => setEditingId(null);
 
+  const startAdd = (type: "icd10" | "cpt") => {
+    setAddingType(type);
+    setAddDraft({ code: "", description: "" });
+  };
+  const saveAdd = () => {
+    if (!addDraft.code.trim() || !addDraft.description.trim()) return;
+    const newItem: CodingItem = {
+      id: `user-${Date.now()}`,
+      type: addingType!,
+      code: addDraft.code.trim().toUpperCase(),
+      description: addDraft.description.trim(),
+      status: "valid",
+      source: "user",
+    };
+    if (addingType === "icd10") setAddedIcd10((prev) => [...prev, newItem]);
+    else setAddedCpt((prev) => [...prev, newItem]);
+    setAddingType(null);
+  };
+  const cancelAdd = () => setAddingType(null);
+
   const VERDICT_COLORS = {
     accept: { color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" },
     query:  { color: "#92400e", bg: "#fffbeb", border: "#fde68a" },
     reject: { color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" },
   };
 
-  const renderCodeCard = (item: typeof allItems[number], type: "icd10" | "cpt") => {
+  const renderCodeCard = (item: CodingItem, type: "icd10" | "cpt") => {
+    if (deletedIds.has(item.id)) return null;
     const verdict = codingVerdicts[item.id] as "accept" | "query" | "reject" | undefined;
-    const isAiExtracted = item.source === "ai";
+    const isHospital = item.source === "hospital";
     const isEditing = editingId === item.id;
     const ov = editedItems[item.id];
     const displayCode = ov?.code ?? item.code;
@@ -413,15 +442,22 @@ function CodingContent({
               <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 {type === "icd10" ? "ICD-10 Diagnosis" : "CPT Procedure"}
               </span>
-              {isAiExtracted ? (
+              {item.source === "ai" && (
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#F5F3FF", color: "#6D28D9", border: "1px solid #DDD6FE", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                   AI Extracted
                 </span>
-              ) : (
+              )}
+              {isHospital && (
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v14a2 2 0 01-2 2z" /></svg>
                   Hospital Submitted
+                </span>
+              )}
+              {item.source === "user" && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#F0FDF4", color: "#166534", border: "1px solid #BBF7D0", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  Added
                 </span>
               )}
               {wasEdited && (
@@ -432,9 +468,9 @@ function CodingContent({
             </div>
             <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-primary)", fontWeight: 500, marginBottom: 0 }}>{displayDescription}</p>
           </div>
-          {/* Explicit decision buttons — no default selection */}
+          {/* Decision buttons */}
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            {(["accept", "query", "reject"] as const).map((v) => {
+            {(["accept", "query"] as const).map((v) => {
               const isSelected = verdict === v;
               const vc = VERDICT_COLORS[v];
               return (
@@ -452,10 +488,43 @@ function CodingContent({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {v === "accept" ? "Accept" : v === "query" ? "Query" : "Reject"}
+                  {v === "accept" ? "Accept" : "Query"}
                 </button>
               );
             })}
+            {isHospital ? (
+              <button
+                onClick={() => setVerdict(item.id, "reject")}
+                style={{
+                  fontSize: "var(--font-size-xs)", fontWeight: 600,
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-xs)",
+                  border: verdict === "reject" ? "2px solid #fecaca" : "1px solid var(--color-border)",
+                  background: verdict === "reject" ? "#fef2f2" : "var(--color-white)",
+                  color: verdict === "reject" ? "#b91c1c" : "var(--color-text-muted)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Reject
+              </button>
+            ) : (
+              <button
+                onClick={() => deleteItem(item.id)}
+                style={{
+                  fontSize: "var(--font-size-xs)", fontWeight: 600,
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-xs)",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-white)",
+                  color: "var(--color-text-muted)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
 
@@ -519,25 +588,82 @@ function CodingContent({
               <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" /></svg>
               Edit
             </button>
-            <button onClick={() => onViewDoc(item)} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "3px 8px", cursor: "pointer" }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-              View in Document
-            </button>
+            {item.source !== "user" && (
+              <button onClick={() => onViewDoc(item)} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "3px 8px", cursor: "pointer" }}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                View in Document
+              </button>
+            )}
           </div>
         )}
       </div>
     );
   };
 
+  const renderAddForm = (type: "icd10" | "cpt") => (
+    <div style={{ background: "var(--color-white)", border: "1.5px dashed var(--color-border)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 12 }}>
+      <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 10 }}>
+        New {type === "icd10" ? "ICD-10 Diagnosis" : "CPT Procedure"} Code
+      </p>
+      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 4 }}>Code</p>
+          <input
+            value={addDraft.code}
+            onChange={(e) => setAddDraft((prev) => ({ ...prev, code: e.target.value }))}
+            placeholder={type === "icd10" ? "e.g. I21.9" : "e.g. 92928"}
+            autoFocus
+            style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 13, width: 90, padding: "3px 8px", border: "1.5px solid var(--color-accent)", borderRadius: "var(--radius-xs)", outline: "none", color: "var(--color-text-primary)", background: "var(--color-white)" }}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 4 }}>Description</p>
+          <input
+            value={addDraft.description}
+            onChange={(e) => setAddDraft((prev) => ({ ...prev, description: e.target.value }))}
+            placeholder="Code description"
+            style={{ width: "100%", fontSize: "var(--font-size-xs)", padding: "3px 8px", border: "1.5px solid var(--color-accent)", borderRadius: "var(--radius-xs)", outline: "none", color: "var(--color-text-primary)", background: "var(--color-white)", boxSizing: "border-box" }}
+          />
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button onClick={cancelAdd} style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "4px 12px", cursor: "pointer" }}>
+          Cancel
+        </button>
+        <button onClick={saveAdd} style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "#fff", background: "var(--color-black)", border: "none", borderRadius: "var(--radius-xs)", padding: "4px 12px", cursor: "pointer" }}>
+          Add Code
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 10 }}>ICD-10 Diagnosis Codes</h3>
-        {coding.icd10.map((item) => renderCodeCard(item, "icd10"))}
+        {[...coding.icd10, ...addedIcd10].map((item) => renderCodeCard(item, "icd10"))}
+        {addingType === "icd10" ? renderAddForm("icd10") : (
+          <button
+            onClick={() => startAdd("icd10")}
+            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", background: "none", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-xs)", padding: "5px 12px", cursor: "pointer", width: "100%", justifyContent: "center" }}
+          >
+            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+            Add Diagnosis Code
+          </button>
+        )}
       </div>
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 10 }}>CPT Procedure Codes</h3>
-        {coding.cpt.map((item) => renderCodeCard(item, "cpt"))}
+        {[...coding.cpt, ...addedCpt].map((item) => renderCodeCard(item, "cpt"))}
+        {addingType === "cpt" ? renderAddForm("cpt") : (
+          <button
+            onClick={() => startAdd("cpt")}
+            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", background: "none", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-xs)", padding: "5px 12px", cursor: "pointer", width: "100%", justifyContent: "center" }}
+          >
+            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+            Add Procedure Code
+          </button>
+        )}
       </div>
       <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
         Diagnosis–procedure match verified. Incorrect codes can cause automated claim rejection.
@@ -557,7 +683,7 @@ const TIER_NAMES: Record<number, string> = {
 };
 
 function MedicalNecessityContent({
-  items, score, p2pRequired, p2pSummary, onViewDoc, onStatusChange,
+  items, score, p2pRequired, p2pSummary, onViewDoc, onStatusChange, alternativeTreatments,
 }: {
   items: PreAuthWorkflowData["medicalNecessity"];
   score: PreAuthWorkflowData["medicalNecessityScore"];
@@ -565,6 +691,7 @@ function MedicalNecessityContent({
   p2pSummary?: PreAuthWorkflowData["p2pSummary"];
   onViewDoc: (item: any) => void;
   onStatusChange: (itemId: string, newStatus: string) => void;
+  alternativeTreatments: AlternativeTreatment[];
 }) {
   const [necessityVerdict, setNecessityVerdict] = useState<"confirmed" | "disputed" | null>(null);
   const scoreColor = score >= 80 ? "var(--color-green, #15803D)" : score >= 50 ? "var(--color-yellow, #CA8A04)" : "var(--color-red, #DC2626)";
@@ -632,6 +759,82 @@ function MedicalNecessityContent({
           </div>
         ))}
       </div>
+
+      {/* ── Treatment Alternatives ────────────────────────────────────────── */}
+      {alternativeTreatments.length > 0 && (() => {
+        const INVASIVENESS_STYLE = {
+          conservative:  { label: "Conservative",  color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" },
+          less_invasive: { label: "Less Invasive",  color: "#15803D", bg: "#F0FDF4", border: "#BBF7D0" },
+          equivalent:    { label: "Equivalent",     color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE" },
+          more_invasive: { label: "More Invasive",  color: "#92400E", bg: "#FFFBEB", border: "#FDE68A" },
+        };
+        const COVERAGE_STYLE = {
+          full:    { color: "#15803D", bg: "#F0FDF4", border: "#BBF7D0", label: null },
+          partial: { color: "#92400E", bg: "#FFFBEB", border: "#FDE68A", label: "partial" },
+          none:    { color: "#9F1239", bg: "#FFF1F2", border: "#FECDD3", label: "unresolved" },
+        };
+        return (
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+              <p style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", margin: 0 }}>
+                Treatment Alternatives
+              </p>
+              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                — other clinically viable options for the presented diagnoses
+              </span>
+            </div>
+            {alternativeTreatments.map((alt) => {
+              const inv = INVASIVENESS_STYLE[alt.invasiveness];
+              return (
+                <div key={alt.id} style={{ background: "var(--color-white)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "14px 16px", marginBottom: 10 }}>
+                  {/* Header: code + name + invasiveness badge */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        {alt.code !== "—" && (
+                          <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 13, color: "var(--color-text-primary)", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "1px 6px" }}>
+                            {alt.code}
+                          </span>
+                        )}
+                        <p style={{ fontSize: "var(--font-size-base)", fontWeight: 600, color: "var(--color-text-primary)", margin: 0 }}>{alt.name}</p>
+                      </div>
+                      {/* Diagnosis coverage chips */}
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {alt.addresses.map((a) => {
+                          const cc = COVERAGE_STYLE[a.coverage];
+                          return (
+                            <div key={a.icdCode} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: "var(--radius-xs)", background: cc.bg, border: `1px solid ${cc.border}` }}>
+                              <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: cc.color }}>{a.icdCode}</span>
+                              <span style={{ fontSize: "var(--font-size-xs)", color: cc.color }}>{a.icdDescription}</span>
+                              {cc.label && (
+                                <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: cc.color, opacity: 0.85 }}>· {cc.label}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: inv.bg, color: inv.color, border: `1px solid ${inv.border}`, whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {inv.label}
+                    </span>
+                  </div>
+                  {/* Rationale */}
+                  <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", lineHeight: 1.6, margin: 0 }}>
+                    {alt.rationale}
+                  </p>
+                  {/* Caveat */}
+                  {alt.caveat && (
+                    <div style={{ display: "flex", gap: 7, alignItems: "flex-start", padding: "7px 10px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "var(--radius-xs)", marginTop: 10 }}>
+                      <span style={{ fontSize: 12, flexShrink: 0, lineHeight: 1.4, color: "#92400E" }}>⚠</span>
+                      <p style={{ fontSize: "var(--font-size-xs)", color: "#78350F", margin: 0, lineHeight: 1.55 }}>{alt.caveat}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <div style={{ background: "var(--color-white)", border: `2px solid ${necessityVerdict === null ? "#FED7AA" : necessityVerdict === "confirmed" ? "#BBF7D0" : "#FECACA"}`, borderRadius: "var(--radius-md)", padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>

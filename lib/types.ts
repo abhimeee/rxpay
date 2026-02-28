@@ -129,7 +129,7 @@ export interface CodingItem {
   code: string;
   description: string;
   status: "valid" | "mismatch" | "missing_specificity";
-  source?: "hospital" | "ai";  // Who provided this code
+  source?: "hospital" | "ai" | "user";  // Who provided this code
   suggestion?: string;
   clinicalContext?: string;  // Quoted text from source document
   diagnosisMatch?: string;   // Plain-English compatibility note
@@ -141,6 +141,21 @@ export interface MedicalNecessityItem {
   source: string;
   finding: string;
   status: "met" | "not_met" | "conditional";
+}
+
+export interface AlternativeTreatment {
+  id: string;
+  code: string;        // CPT code, or "—" for non-CPT options
+  name: string;
+  // Each entry maps a diagnosis to how well this alternative addresses it
+  addresses: {
+    icdCode: string;
+    icdDescription: string;
+    coverage: "full" | "partial" | "none";  // "none" = this diagnosis remains unresolved
+  }[];
+  rationale: string;
+  invasiveness: "conservative" | "less_invasive" | "equivalent" | "more_invasive";
+  caveat?: string;
 }
 
 export interface MedicalNecessityInsight {
@@ -214,6 +229,7 @@ export interface WorkflowTimelineEvent {
 }
 
 export interface PreAuthWorkflowData {
+  alternativeTreatments: AlternativeTreatment[];
   requestSummary: {
     admissionType: "planned" | "emergency";
     submittedWithinSLA: boolean;

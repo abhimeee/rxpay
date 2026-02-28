@@ -4,6 +4,41 @@ import type { PreAuthWorkflowData, WorkflowStageId } from "./types";
 
 const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
   PA001: {
+    alternativeTreatments: [
+      {
+        id: "alt1",
+        code: "J0285",
+        name: "Fibrinolytic Therapy (Alteplase IV)",
+        addresses: [
+          { icdCode: "I21.9", icdDescription: "Acute myocardial infarction", coverage: "full" },
+        ],
+        rationale: "First-line reperfusion strategy when primary PCI cannot be performed within 90 minutes of first medical contact. ACC/AHA guidelines recommend thrombolysis if door-to-balloon time exceeds 120 minutes. Achieves 60–70% TIMI-3 flow vs >90% with PCI.",
+        invasiveness: "conservative",
+        caveat: "Contraindicated with recent surgery (<3 weeks), prior haemorrhagic stroke, active bleeding, or systolic BP >180 mmHg. Efficacy significantly lower than PCI for STEMI; rescue PCI may still be required.",
+      },
+      {
+        id: "alt2",
+        code: "33533",
+        name: "Coronary Artery Bypass Graft (CABG)",
+        addresses: [
+          { icdCode: "I21.9", icdDescription: "Acute myocardial infarction", coverage: "full" },
+        ],
+        rationale: "Preferred over PCI when ≥3-vessel coronary disease is present, significant left main stenosis (>50%) is identified, or in diabetic patients with multi-vessel CAD where CABG demonstrates superior long-term survival (FREEDOM trial, SYNTAX score).",
+        invasiveness: "more_invasive",
+        caveat: "Generally deferred in the acute STEMI setting; typically planned electively after haemodynamic stabilisation. Higher short-term morbidity (cardiopulmonary bypass, sternotomy); median length of stay 5–7 days.",
+      },
+      {
+        id: "alt3",
+        code: "—",
+        name: "Optimal Medical Therapy (OMT) alone",
+        addresses: [
+          { icdCode: "I21.9", icdDescription: "Acute myocardial infarction", coverage: "partial" },
+        ],
+        rationale: "Anticoagulation, dual antiplatelet therapy, beta-blockers, ACE inhibitors, and statins. Appropriate for patients who refuse revascularisation, have prohibitive surgical/interventional risk, or present very late (>12 hours, stable).",
+        invasiveness: "conservative",
+        caveat: "Significantly inferior outcomes for STEMI with persistent ST-elevation. OMT alone is not the standard of care for acute reperfusion-eligible STEMI; mortality benefit of revascularisation is well-established.",
+      },
+    ],
     requestSummary: {
       admissionType: "emergency",
       submittedWithinSLA: true,
@@ -137,6 +172,44 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     p2pRequired: false,
   },
   PA002: {
+    alternativeTreatments: [
+      {
+        id: "alt1",
+        code: "47600",
+        name: "Open Cholecystectomy",
+        addresses: [
+          { icdCode: "K80.1", icdDescription: "Calculus of gallbladder with acute cholecystitis", coverage: "full" },
+          { icdCode: "K81.0", icdDescription: "Acute cholecystitis", coverage: "full" },
+        ],
+        rationale: "Indicated when laparoscopic approach is contraindicated or has failed — prior upper abdominal surgery with dense adhesions, morbid obesity (BMI >40), suspected gallbladder carcinoma, severe pericholecystic collection, or intraoperative conversion from laparoscopic. Provides definitive resolution of both the gallstones (K80.1) and the acute inflammation (K81.0).",
+        invasiveness: "more_invasive",
+        caveat: "Higher morbidity than laparoscopic approach — larger incision, greater blood loss, longer hospital stay (5–7 days vs 1–2 days), and slower return to activity. Reserved for specific contraindications to laparoscopy.",
+      },
+      {
+        id: "alt2",
+        code: "47490",
+        name: "Percutaneous Cholecystostomy (Tube Drainage)",
+        addresses: [
+          { icdCode: "K80.1", icdDescription: "Calculus of gallbladder with acute cholecystitis", coverage: "none" },
+          { icdCode: "K81.0", icdDescription: "Acute cholecystitis", coverage: "full" },
+        ],
+        rationale: "Image-guided tube drainage of the acutely inflamed gallbladder. Suitable for critically ill patients who cannot safely tolerate general anaesthesia or surgery — controls acute sepsis from cholecystitis and stabilises the patient as a bridge to definitive cholecystectomy.",
+        invasiveness: "less_invasive",
+        caveat: "Does not remove the gallstones — K80.1 remains entirely unresolved. High recurrence risk for cholecystitis; definitive cholecystectomy still required once the patient is fit for surgery. This is a temporising, not curative, intervention for this patient's combined presentation.",
+      },
+      {
+        id: "alt3",
+        code: "43262",
+        name: "ERCP with Sphincterotomy",
+        addresses: [
+          { icdCode: "K80.1", icdDescription: "Calculus of gallbladder with acute cholecystitis", coverage: "partial" },
+          { icdCode: "K81.0", icdDescription: "Acute cholecystitis", coverage: "none" },
+        ],
+        rationale: "Endoscopic retrograde cholangiopancreatography with sphincterotomy to clear common bile duct stones (choledocholithiasis). Appropriate if concurrent CBD stones are suspected based on dilated CBD on ultrasound, raised ALP/bilirubin, or intraoperative cholangiogram findings.",
+        invasiveness: "less_invasive",
+        caveat: "Addresses ductal stones only — does not remove the gallbladder or gallstones within it. K81.0 (acute cholecystitis) is entirely unresolved by ERCP. Cholecystectomy remains necessary for definitive management of this patient's primary presentation.",
+      },
+    ],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -263,6 +336,41 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     p2pRequired: false,
   },
   PA003: {
+    alternativeTreatments: [
+      {
+        id: "alt1",
+        code: "27446",
+        name: "Unicompartmental Knee Arthroplasty (UKA)",
+        addresses: [
+          { icdCode: "M17.11", icdDescription: "Unilateral primary OA, right knee", coverage: "full" },
+        ],
+        rationale: "Suitable when OA is confirmed to a single compartment (medial or lateral) on imaging. Preserves healthy cartilage, cruciate ligaments, and proprioception — resulting in faster recovery, lower blood loss, and more natural knee kinematics than TKR. Outcomes comparable to TKR in appropriately selected patients (Oxford Knee Score at 10 years).",
+        invasiveness: "less_invasive",
+        caveat: "Not appropriate for tricompartmental OA or varus deformity >10°. Contraindicated if ACL is deficient or inflammatory arthritis is present. Requires pre-operative MRI/CT to confirm compartmental involvement — KL Grade IV with medial collapse may still require TKR.",
+      },
+      {
+        id: "alt2",
+        code: "27457",
+        name: "High Tibial Osteotomy (HTO)",
+        addresses: [
+          { icdCode: "M17.11", icdDescription: "Unilateral primary OA, right knee", coverage: "full" },
+        ],
+        rationale: "Preferred in younger patients (<55 years) with medial compartment OA and varus malalignment. Realigns the mechanical axis to offload the affected compartment, slowing OA progression and delaying the need for arthroplasty by 10–15 years. Preserves the native joint.",
+        invasiveness: "equivalent",
+        caveat: "Requires KL Grade II–III OA; not indicated for severe tricompartmental OA (KL Grade IV) or fixed flexion deformity >10°. Requires bone healing post-procedure with restricted weight-bearing for 6–8 weeks. Not suitable if the patient is older or has significant bone loss.",
+      },
+      {
+        id: "alt3",
+        code: "20610",
+        name: "Intra-articular Injection (Corticosteroid / Viscosupplementation)",
+        addresses: [
+          { icdCode: "M17.11", icdDescription: "Unilateral primary OA, right knee", coverage: "partial" },
+        ],
+        rationale: "Intra-articular corticosteroid or hyaluronic acid injection provides short-to-medium term pain relief and functional improvement. Appropriate as a bridge for patients awaiting surgery, those unfit for operation, or as part of a conservative management step before escalating to arthroplasty.",
+        invasiveness: "conservative",
+        caveat: "Evidence for viscosupplementation is limited for KL Grade III/IV OA. Provides symptomatic relief only — does not halt cartilage destruction or correct deformity. Effects typically last 3–6 months. Given KL Grade III disease documented in this case, surgical planning should not be deferred solely on the basis of injection response.",
+      },
+    ],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -381,6 +489,30 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     p2pSummary: { scheduled: "2025-02-05 11:00", outcome: "Pending", reviewer: "Dr. S. Rao, Ortho (Insurer)" },
   },
   PA004: {
+    alternativeTreatments: [
+      {
+        id: "alt1",
+        code: "66982",
+        name: "Manual Small-Incision Cataract Surgery (MSICS)",
+        addresses: [
+          { icdCode: "H25.1", icdDescription: "Senile nuclear cataract", coverage: "full" },
+        ],
+        rationale: "Suitable for dense nuclear cataracts where phacoemulsification ultrasound energy carries higher risk of corneal decompensation. Comparable visual outcomes to phaco in multiple RCTs with a slightly wider (6–7 mm) incision; significantly lower cost and equipment dependency. Preferred in resource-limited settings and hard brown cataracts.",
+        invasiveness: "equivalent",
+        caveat: "Slightly larger wound may induce more post-operative astigmatism compared to phacoemulsification. For a soft to moderate density nuclear cataract, phaco (66984) remains the standard of care with faster recovery.",
+      },
+      {
+        id: "alt2",
+        code: "—",
+        name: "Conservative Management (Corrective Lenses)",
+        addresses: [
+          { icdCode: "H25.1", icdDescription: "Senile nuclear cataract", coverage: "partial" },
+        ],
+        rationale: "Updated spectacle prescription, high-contrast lenses, or magnification aids can improve functional vision for early-stage cataracts where best-corrected visual acuity (BCVA) remains acceptable (>6/18) and daily activities are not significantly impaired. Appropriate to defer surgery when the patient is not yet symptomatic enough to warrant intervention.",
+        invasiveness: "conservative",
+        caveat: "Cataracts are progressive — vision will continue to deteriorate regardless of optical correction. Surgery is the only definitive treatment. With BCVA documented at 6/36 in this case, conservative management is unlikely to provide adequate functional vision. Not covered under standard hospitalisation policy.",
+      },
+    ],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -498,7 +630,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     p2pRequired: false,
   },
-  PA005: {
+  PA005: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -558,7 +690,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA006: {
+  PA006: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -620,7 +752,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     p2pRequired: false,
   },
-  PA007: {
+  PA007: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -683,7 +815,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     p2pRequired: true,
     p2pSummary: { scheduled: "2025-02-05 15:30", outcome: "Pending", reviewer: "Dr. N. Sethi, Onco (Insurer)" },
   },
-  PA008: {
+  PA008: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -743,7 +875,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA009: {
+  PA009: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -806,7 +938,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     p2pRequired: true,
     p2pSummary: { scheduled: "2025-02-06 10:30", outcome: "Pending", reviewer: "Dr. V. Iyer, Cardiology (Insurer)" },
   },
-  PA010: {
+  PA010: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -866,7 +998,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA011: {
+  PA011: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -926,7 +1058,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA012: {
+  PA012: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -1001,7 +1133,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     p2pRequired: false,
   },
-  PA013: {
+  PA013: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -1054,7 +1186,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA014: {
+  PA014: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "emergency",
       submittedWithinSLA: true,
@@ -1103,7 +1235,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [{ id: "q1", question: "Please upload X-ray report of left femur.", status: "open", dueDate: "2025-02-05" }],
     p2pRequired: false,
   },
-  PA015: {
+  PA015: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -1154,7 +1286,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [{ id: "q1", question: "Please provide histopathology report and staging PET scan.", status: "open", dueDate: "2025-02-07" }],
     p2pRequired: false,
   },
-  PA016: {
+  PA016: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -1204,7 +1336,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA017: {
+  PA017: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "emergency",
       submittedWithinSLA: true,
@@ -1252,7 +1384,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [{ id: "q1", question: "Please upload NS1/IgM positive report and serial platelet counts.", status: "open", dueDate: "2025-02-06" }],
     p2pRequired: false,
   },
-  PA018: {
+  PA018: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -1284,7 +1416,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     queries: [],
     p2pRequired: false,
   },
-  PA019: {
+  PA019: { alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
@@ -1333,6 +1465,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     p2pRequired: false,
   },
   PA020: {
+    alternativeTreatments: [],
     requestSummary: {
       admissionType: "planned",
       submittedWithinSLA: true,
