@@ -2,289 +2,514 @@
 
 import { useState } from "react";
 import { FraudRedFlag } from "@/lib/types";
+import { QueryModal } from "../../components/QueryModal";
 
-// --- Helper Functions ---
+type ResolutionAction = "safe" | "escalate" | "confirmed_fraud";
 
-const getStatus = (severity: string): "passed" | "warning" | "failed" => {
-    if (severity === 'high') return 'failed';
-    // Only medium severity is a warning. Low/None are passed/verified.
-    if (severity === 'medium') return 'warning';
-    return 'passed';
-};
+interface FlagResolution {
+  action: ResolutionAction | null;
+  reason: string;
+  saved: boolean;
+}
 
-// --- Helper Components ---
-
-function FraudCheckItem({
-    title,
-    initialStatus,
-    description,
-    severity,
-    onViewDoc,
+function FlagCard({
+  flag,
+  onViewDoc,
 }: {
-    title: string;
-    initialStatus: "passed" | "warning" | "failed";
-    description?: string;
-    severity?: "low" | "medium" | "high" | "none";
-    onViewDoc?: () => void;
+  flag: FraudRedFlag;
+  onViewDoc: () => void;
 }) {
-    // Local resolution state
-    const [resolution, setResolution] = useState<"pending" | "safe" | "confirmed">("pending");
+  const [resolution, setResolution] = useState<FlagResolution>({
+    action: null,
+    reason: "",
+    saved: false,
+  });
+  const [modalOpen, setModalOpen] = useState(false);
 
-    // Determine effective status based on resolution
-    const effectiveStatus = resolution === "safe" ? "passed" : initialStatus;
-    const isResolved = resolution !== "pending";
+  const isCritical = flag.severity === "high";
+  const isWarning = flag.severity === "medium";
 
-    const isGood = effectiveStatus === "passed";
-    const isWarning = effectiveStatus === "warning";
+  const borderColor = isCritical ? "#FECACA" : isWarning ? "#FDE68A" : "var(--color-border)";
+  const bgColor = isCritical ? "#FEF2F2" : isWarning ? "#FFFBEB" : "var(--color-white)";
 
-    // Styles
-    const containerClass = isGood
-        ? "border-slate-200 bg-white"
-        : isWarning
-            ? "border-amber-200 bg-amber-50/10"
-            : "border-rose-200 bg-rose-50/10";
+  const severityLabel = isCritical ? "Critical" : isWarning ? "Warning" : "Low";
+  const severityColor = isCritical ? "#B91C1C" : isWarning ? "#92400E" : "#15803D";
+  const severityBg = isCritical ? "#FEF2F2" : isWarning ? "#FFFBEB" : "#F0FDF4";
+  const severityBorder = isCritical ? "#FECACA" : isWarning ? "#FDE68A" : "#BBF7D0";
 
-    const icon = isGood ? (
-        <div className={`flex h-5.5 w-5.5 items-center justify-center rounded-full ${resolution === 'safe' ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-        </div>
-    ) : (
-        <div className={`flex h-5.5 w-5.5 items-center justify-center rounded-full ring-2 ${isWarning ? "bg-amber-100 text-amber-600 ring-amber-50" : "bg-rose-100 text-rose-600 ring-rose-50"}`}>
-            <span className="text-xs font-black">!</span>
-        </div>
-    );
+  const categoryLabel = { provider: "Provider", patient: "Patient", document: "Document" }[flag.category];
 
-    let statusLabel = isGood ? "Verified" : isWarning ? "Warning" : "Critical";
-    let statusClass = isGood
-        ? "bg-slate-50 text-slate-600 border border-slate-200"
-        : isWarning
-            ? "bg-amber-50 text-amber-700 border border-amber-200 shadow-sm"
-            : "bg-rose-50 text-rose-700 border border-rose-200 shadow-sm";
+  const canSave = resolution.action !== null && resolution.reason.trim().length >= 10;
 
-    if (resolution === 'safe') {
-        statusLabel = "In Review: Safe";
-        statusClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
-    } else if (resolution === 'confirmed') {
-        statusLabel = "Confirmed Fraud";
-        statusClass = "bg-rose-900 text-white border border-rose-700 shadow-md";
-    }
-
+  if (resolution.saved) {
+    const savedLabels: Record<ResolutionAction, string> = {
+      safe: "Safe",
+      escalate: "Escalated to Fraud Team",
+      confirmed_fraud: "Confirmed Fraud",
+    };
     return (
-        <div className={`group relative rounded-2xl border p-5 mb-3 transition-all duration-300 ${containerClass}`}>
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-5 min-w-0 flex-1">
-                    <div className="mt-0.5 shrink-0 flex items-center justify-center w-6 min-h-[24px]">
-                        {icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className={`text-base font-bold tracking-tight text-slate-900`}>{title}</p>
-
-                        {/* Details Block - Only shown if not good, OR if explicitly confirmed as fraud */}
-                        {((description && !isGood && resolution === 'pending') || resolution === 'confirmed') && (
-                            <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
-                                <div className={`rounded-xl border-2 px-4 py-3.5 ${resolution === 'confirmed' ? "bg-rose-100 border-rose-200" : isWarning ? "bg-amber-50/60 border-amber-100/80" : "bg-rose-50/60 border-rose-100/80"}`}>
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                        <div className={`h-1.5 w-1.5 rounded-full ${resolution === 'confirmed' ? "bg-rose-600" : isWarning ? "bg-amber-500" : "bg-rose-500"}`} />
-                                        <p className={`text-[10px] font-black uppercase tracking-widest ${resolution === 'confirmed' ? "text-rose-800" : isWarning ? "text-amber-700" : "text-rose-700"}`}>
-                                            {resolution === 'confirmed' ? "Fraud Confirmed" : "Analysis Finding"}
-                                        </p>
-                                    </div>
-                                    <p className="text-[13px] text-slate-700 leading-relaxed font-semibold">
-                                        {description}
-                                    </p>
-
-                                    {/* Action Buttons */}
-                                    {resolution === 'pending' && (
-                                        <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-slate-200/50">
-                                            {onViewDoc && (
-                                                <button
-                                                    onClick={onViewDoc}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:text-teal-600 hover:border-teal-200 shadow-sm transition-all"
-                                                >
-                                                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                    Check Evidence
-                                                </button>
-                                            )}
-                                            <div className="flex items-center gap-2 ml-auto">
-                                                <button
-                                                    onClick={() => setResolution("safe")}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
-                                                >
-                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    Mark as Safe
-                                                </button>
-                                                <button
-                                                    onClick={() => setResolution("confirmed")}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 border border-rose-100 px-3 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100 transition-colors"
-                                                >
-                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                    </svg>
-                                                    Confirm Risk
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {/* If resolved as safe, show a simplified message */}
-                        {resolution === 'safe' && (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 font-medium animate-in fade-in duration-300">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Marked as safe by user.
-                                <button onClick={() => setResolution("pending")} className="text-slate-400 hover:text-slate-600 underline">Undo</button>
-                            </div>
-                        )}
-                        {/* Default 'good' message */}
-                        {isGood && resolution !== 'safe' && description && (
-                            <p className="text-sm text-slate-500 mt-1">{description}</p>
-                        )}
-                    </div>
-                </div>
-                <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider transition-all shadow-sm ${statusClass}`}>
-                    {statusLabel}
-                </span>
-            </div>
+      <div style={{
+        background: "var(--color-white)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-md)",
+        padding: "12px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "#15803D", fontWeight: 700 }}>✓</span>
+          <span style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-secondary)" }}>
+            Resolved as: <strong style={{ color: "var(--color-text-primary)" }}>{savedLabels[resolution.action!]}</strong>
+          </span>
+          <span style={{
+            fontSize: "var(--font-size-xs)",
+            color: "var(--color-text-muted)",
+            background: "var(--color-bg)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-xs)",
+            padding: "1px 6px",
+          }}>
+            {flag.description.slice(0, 50)}{flag.description.length > 50 ? "…" : ""}
+          </span>
         </div>
+        <button
+          onClick={() => setResolution({ action: null, reason: "", saved: false })}
+          style={{
+            fontSize: "var(--font-size-xs)",
+            color: "var(--color-text-muted)",
+            background: "none",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-xs)",
+            padding: "2px 8px",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          Undo
+        </button>
+      </div>
     );
+  }
+
+  return (
+    <div style={{
+      background: bgColor,
+      border: `1px solid ${borderColor}`,
+      borderRadius: "var(--radius-md)",
+      padding: "16px",
+      marginBottom: 0,
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{
+              fontSize: "var(--font-size-xs)",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              padding: "2px 7px",
+              borderRadius: 20,
+              background: severityBg,
+              color: severityColor,
+              border: `1px solid ${severityBorder}`,
+            }}>
+              {severityLabel}
+            </span>
+            <span style={{
+              fontSize: "var(--font-size-xs)",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "var(--color-text-muted)",
+            }}>
+              {categoryLabel} Flag
+            </span>
+          </div>
+          {/* Evidence blockquote */}
+          <blockquote style={{
+            borderLeft: `3px solid ${isCritical ? "#FCA5A5" : isWarning ? "#FCD34D" : "#CCCCCC"}`,
+            background: "rgba(255,255,255,0.6)",
+            padding: "8px 12px",
+            margin: 0,
+            borderRadius: "0 var(--radius-xs) var(--radius-xs) 0",
+            fontSize: "var(--font-size-xs)",
+            color: "var(--color-text-secondary)",
+            fontStyle: "italic",
+            marginBottom: 10,
+          }}>
+            {flag.description}
+          </blockquote>
+        </div>
+      </div>
+
+      {/* Historical context */}
+      {(flag.providerFraudRate !== undefined || flag.patientClaimsCount !== undefined) && (
+        <div style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 12,
+          fontSize: "var(--font-size-xs)",
+          color: "var(--color-text-muted)",
+        }}>
+          {flag.providerFraudRate !== undefined && (
+            <span>Provider fraud rate: <strong style={{ color: "var(--color-text-secondary)" }}>{flag.providerFraudRate}%</strong></span>
+          )}
+          {flag.patientClaimsCount !== undefined && (
+            <span>Patient claims this year: <strong style={{ color: "var(--color-text-secondary)" }}>{flag.patientClaimsCount}</strong></span>
+          )}
+        </div>
+      )}
+
+      {/* View Evidence button */}
+      <div style={{ marginBottom: 14 }}>
+        <button
+          onClick={onViewDoc}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: "var(--font-size-xs)",
+            fontWeight: 600,
+            color: "var(--color-text-secondary)",
+            background: "var(--color-white)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-xs)",
+            padding: "4px 10px",
+            cursor: "pointer",
+          }}
+        >
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          View Evidence in Document
+        </button>
+      </div>
+
+      {/* Resolution radio group */}
+      <div style={{
+        background: "var(--color-white)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-sm)",
+        padding: "12px",
+      }}>
+        <p style={{
+          fontSize: "var(--font-size-xs)",
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          color: "var(--color-text-muted)",
+          marginBottom: 10,
+        }}>
+          Resolution
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+          {([
+            { value: "safe", label: "Mark as Safe", color: "#15803D", bg: "#F0FDF4", border: "#BBF7D0" },
+            { value: "escalate", label: "Escalate to Fraud Team", color: "#92400E", bg: "#FFFBEB", border: "#FDE68A" },
+            { value: "confirmed_fraud", label: "Confirm Fraud", color: "#B91C1C", bg: "#FEF2F2", border: "#FECACA" },
+          ] as const).map((opt) => (
+            <label
+              key={opt.value}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 10px",
+                borderRadius: "var(--radius-xs)",
+                border: resolution.action === opt.value ? `1px solid ${opt.border}` : "1px solid var(--color-border)",
+                background: resolution.action === opt.value ? opt.bg : "var(--color-white)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="radio"
+                name={`resolution-${flag.id}`}
+                value={opt.value}
+                checked={resolution.action === opt.value}
+                onChange={() => setResolution((prev) => ({ ...prev, action: opt.value }))}
+                style={{ margin: 0 }}
+              />
+              <span style={{
+                fontSize: "var(--font-size-base)",
+                fontWeight: 500,
+                color: resolution.action === opt.value ? opt.color : "var(--color-text-primary)",
+              }}>
+                {opt.label}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {/* Required reasoning / confirmation action */}
+        {resolution.action !== null && (
+          <div style={{ marginTop: 10 }}>
+            {resolution.reason.trim().length >= 10 ? (
+              <div style={{ marginBottom: 10, padding: "8px 10px", background: "var(--color-bg)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                <p style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 4 }}>Reasoning Provided:</p>
+                <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-primary)", margin: 0 }}>
+                  {resolution.reason.length > 50 ? resolution.reason.substring(0, 50) + "..." : resolution.reason}
+                </p>
+                <button
+                  onClick={() => setModalOpen(true)}
+                  style={{ marginTop: 6, fontSize: 10, fontWeight: 600, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "2px 8px", cursor: "pointer" }}
+                >
+                  Edit Reasoning
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setModalOpen(true)}
+                style={{
+                  width: "100%",
+                  marginBottom: 10,
+                  padding: "6px 0",
+                  background: "var(--color-white)",
+                  color: "var(--color-text-primary)",
+                  border: "1px dashed var(--color-border-dark)",
+                  borderRadius: "var(--radius-xs)",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                + Add Reasoning (Required)
+              </button>
+            )}
+
+            <button
+              onClick={() => setResolution((prev) => ({ ...prev, saved: true }))}
+              disabled={!canSave}
+              style={{
+                width: "100%",
+                padding: "7px 0",
+                background: canSave ? "var(--color-black)" : "var(--color-border)",
+                color: canSave ? "#fff" : "var(--color-text-muted)",
+                border: "none",
+                borderRadius: "var(--radius-xs)",
+                fontSize: "var(--font-size-xs)",
+                fontWeight: 600,
+                cursor: canSave ? "pointer" : "not-allowed",
+              }}
+            >
+              Save Resolution
+            </button>
+
+            <QueryModal
+              isOpen={modalOpen}
+              title={`Reasoning for ${resolution.action === "safe" ? "Marking Safe" : resolution.action === "escalate" ? "Escalation" : "Confirmation"}`}
+              initialText={resolution.reason}
+              onSave={(newReason: string) => {
+                setResolution((prev) => ({ ...prev, reason: newReason }));
+                setModalOpen(false);
+              }}
+              onClose={() => setModalOpen(false)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ClearedFlagRow({ flag }: { flag: FraudRedFlag }) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 12px",
+      borderBottom: "1px solid var(--color-border)",
+    }}>
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#15803D" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        {{ provider: "Provider", patient: "Patient", document: "Document" }[flag.category]}
+      </span>
+      <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", flex: 1 }}>
+        {flag.description}
+      </span>
+      <span style={{
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "1px 6px",
+        borderRadius: 20,
+        background: "#F0FDF4",
+        color: "#15803D",
+        border: "1px solid #BBF7D0",
+      }}>
+        Cleared
+      </span>
+    </div>
+  );
 }
 
 export function FraudSection({
-    flags,
-    onViewDoc,
+  flags,
+  onViewDoc,
 }: {
-    flags: FraudRedFlag[];
-    onViewDoc: (item: FraudRedFlag) => void;
+  flags: FraudRedFlag[];
+  onViewDoc: (item: FraudRedFlag) => void;
 }) {
-    const fraudScore = flags.length
-        ? Math.max(
-            ...flags.map((flag) =>
-                flag.severity === "high" ? 92 : flag.severity === "medium" ? 74 : flag.severity === "low" ? 48 : 12
-            )
-        )
-        : 0;
+  const [clearedExpanded, setClearedExpanded] = useState(false);
 
-    const hasCritical = fraudScore > 75;
-    const isClear = fraudScore < 20;
+  // Compute explained score
+  const activeFlags = flags.filter((f) => f.severity !== "none");
+  const providerFlags = flags.filter((f) => f.category === "provider");
+  const docFlags = flags.filter((f) => f.category === "document");
+  const patientFlags = flags.filter((f) => f.category === "patient");
 
-    // Group flags by category
-    const providerFlags = flags.filter(f => f.category === "provider");
-    const patientFlags = flags.filter(f => f.category === "patient");
-    const docFlags = flags.filter(f => f.category === "document");
+  const providerScore = providerFlags.reduce((acc, f) => acc + (f.severity === "high" ? 30 : f.severity === "medium" ? 15 : f.severity === "low" ? 5 : 0), 0);
+  const docScore = docFlags.reduce((acc, f) => acc + (f.severity === "high" ? 30 : f.severity === "medium" ? 15 : f.severity === "low" ? 5 : 0), 0);
+  const patientScore = patientFlags.reduce((acc, f) => acc + (f.severity === "high" ? 30 : f.severity === "medium" ? 15 : f.severity === "low" ? 5 : 0), 0);
+  const fraudScore = Math.min(100, providerScore + docScore + patientScore);
 
-    return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+  const activeProviderFlags = providerFlags.filter((f) => f.severity !== "none");
+  const activeDocFlags = docFlags.filter((f) => f.severity !== "none");
+  const activePatientFlags = patientFlags.filter((f) => f.severity !== "none");
 
-            {/* AI Analysis Control Card */}
-            <div className="rounded-3xl border border-slate-200 bg-white shadow-xl overflow-hidden ring-1 ring-slate-100 p-8">
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Fraud Risk Assessment</h2>
-                        <p className="text-sm text-slate-500 mt-1">
-                            {hasCritical
-                                ? "Critical anomalies detected requiring immediate review."
-                                : isClear
-                                    ? "No significant risk patterns identified."
-                                    : "Potential irregularities found in claims data."}
-                        </p>
-                    </div>
-                    <div className={`px-4 py-2 rounded-2xl border ${hasCritical ? "bg-rose-50 border-rose-100 text-rose-700" : isClear ? "bg-emerald-50 border-emerald-100 text-emerald-700" : "bg-amber-50 border-amber-100 text-amber-700"}`}>
-                        <span className="text-xs font-black uppercase tracking-widest block mb-0.5 opacity-70">Risk Score</span>
-                        <span className="text-2xl font-black">{fraudScore}/100</span>
-                    </div>
-                </div>
+  const clearedFlags = flags.filter((f) => f.severity === "none" || f.resolved === true);
 
-                {/* Simple Status Bar */}
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-6">
-                    <div
-                        className={`h-full rounded-full transition-all duration-1000 ${hasCritical ? "bg-rose-500" : isClear ? "bg-emerald-500" : "bg-amber-500"}`}
-                        style={{ width: `${Math.max(5, fraudScore)}%` }}
-                    />
-                </div>
-            </div>
+  const hasCritical = fraudScore >= 75;
+  const isClear = fraudScore < 20;
 
-            {/* Checklist Items */}
-            <div>
-                <div className="flex items-center gap-2 mb-6 px-1">
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">Risk Checks</h3>
-                    <span className="text-[10px] font-black text-white bg-slate-800 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                        {flags.length > 0 ? "Issues Found" : "All Clear"}
-                    </span>
-                </div>
+  const scoreColor = hasCritical ? "#B91C1C" : isClear ? "#15803D" : "#92400E";
+  const scoreBg = hasCritical ? "#FEF2F2" : isClear ? "#F0FDF4" : "#FFFBEB";
+  const scoreBorder = hasCritical ? "#FECACA" : isClear ? "#BBF7D0" : "#FDE68A";
 
-                <div className="space-y-4">
-                    {/* 1. Provider Integrity Check */}
-                    {providerFlags.length > 0 ? (
-                        providerFlags.map(flag => (
-                            <FraudCheckItem
-                                key={flag.id}
-                                title="Provider Integrity Check"
-                                initialStatus={getStatus(flag.severity)}
-                                severity={flag.severity}
-                                description={flag.description}
-                                onViewDoc={() => onViewDoc(flag)}
-                            />
-                        ))
-                    ) : (
-                        <FraudCheckItem
-                            title="Provider Integrity Check"
-                            initialStatus="passed"
-                            description="No historical anomalies or billing irregularities detected for this facility."
-                        />
-                    )}
-
-                    {/* 2. Patient Authenticity Check */}
-                    {patientFlags.length > 0 ? (
-                        patientFlags.map(flag => (
-                            <FraudCheckItem
-                                key={flag.id}
-                                title="Patient Authenticity Check"
-                                initialStatus={getStatus(flag.severity)}
-                                severity={flag.severity}
-                                description={flag.description}
-                                onViewDoc={() => onViewDoc(flag)}
-                            />
-                        ))
-                    ) : (
-                        <FraudCheckItem
-                            title="Patient Authenticity Check"
-                            initialStatus="passed"
-                            description="Identity verified against enrollment data and biometric logs."
-                        />
-                    )}
-
-                    {/* 3. Document Forensic Check */}
-                    {docFlags.length > 0 ? (
-                        docFlags.map(flag => (
-                            <FraudCheckItem
-                                key={flag.id}
-                                title="Document Forensic Check"
-                                initialStatus={getStatus(flag.severity)}
-                                severity={flag.severity}
-                                description={flag.description}
-                                onViewDoc={() => onViewDoc(flag)}
-                            />
-                        ))
-                    ) : (
-                        <FraudCheckItem
-                            title="Document Forensic Check"
-                            initialStatus="passed"
-                            description="No signs of tampering, editing, or metadata inconsistencies."
-                        />
-                    )}
-                </div>
-            </div>
-
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Score card */}
+      <div style={{
+        background: scoreBg,
+        border: `1px solid ${scoreBorder}`,
+        borderRadius: "var(--radius-md)",
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 20,
+      }}>
+        <div style={{
+          width: 64,
+          height: 64,
+          borderRadius: "var(--radius-sm)",
+          background: scoreColor,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>{fraudScore}</span>
         </div>
-    );
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: "var(--font-size-base)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+            Fraud Risk Score: {fraudScore}/100
+          </p>
+          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", marginBottom: 8 }}>
+            {hasCritical
+              ? "Critical anomalies detected requiring immediate review."
+              : isClear
+                ? "No significant risk patterns identified."
+                : "Potential irregularities found — review flagged items."}
+          </p>
+          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+            Score calculated from: {activeProviderFlags.length} provider flag{activeProviderFlags.length !== 1 ? "s" : ""} + {activeDocFlags.length} document anomal{activeDocFlags.length !== 1 ? "ies" : "y"} + {activePatientFlags.length} patient flag{activePatientFlags.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+
+      {/* Active flags — flagged first */}
+      {activeFlags.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p style={{
+            fontSize: "var(--font-size-xs)",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            color: "var(--color-text-muted)",
+          }}>
+            Active Flags ({activeFlags.length})
+          </p>
+          {activeFlags.map((flag) => (
+            <FlagCard
+              key={flag.id}
+              flag={flag}
+              onViewDoc={() => onViewDoc(flag)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{
+          background: "#F0FDF4",
+          border: "1px solid #BBF7D0",
+          borderRadius: "var(--radius-md)",
+          padding: "16px",
+          textAlign: "center",
+        }}>
+          <p style={{ fontSize: "var(--font-size-base)", fontWeight: 600, color: "#15803D", marginBottom: 4 }}>
+            ✓ No Active Fraud Flags
+          </p>
+          <p style={{ fontSize: "var(--font-size-xs)", color: "#166534" }}>
+            All fraud checks cleared. No suspicious patterns detected.
+          </p>
+        </div>
+      )}
+
+      {/* Cleared flags — collapsed section */}
+      {clearedFlags.length > 0 && (
+        <div style={{
+          background: "var(--color-white)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-md)",
+          overflow: "hidden",
+        }}>
+          <button
+            type="button"
+            onClick={() => setClearedExpanded((o) => !o)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 14px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ fontSize: "var(--font-size-base)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
+              Cleared Checks ({clearedFlags.length})
+            </span>
+            <svg
+              width="14" height="14"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              style={{
+                transform: clearedExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.15s",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {clearedExpanded && (
+            <div style={{ borderTop: "1px solid var(--color-border)" }}>
+              {clearedFlags.map((flag) => (
+                <ClearedFlagRow key={flag.id} flag={flag} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

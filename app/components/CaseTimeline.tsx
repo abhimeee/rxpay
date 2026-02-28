@@ -1,10 +1,10 @@
 import type { WorkflowTimelineEvent } from "@/lib/types";
 
-const timelineStatusStyles: Record<WorkflowTimelineEvent["status"], { dot: string; badge: string; label: string }> = {
-  done: { dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-800", label: "Completed" },
-  current: { dot: "bg-indigo-500", badge: "bg-indigo-100 text-indigo-800", label: "Current" },
-  pending: { dot: "bg-amber-500", badge: "bg-amber-100 text-amber-800", label: "Pending" },
-  info: { dot: "bg-slate-400", badge: "bg-slate-100 text-slate-700", label: "Info" },
+const statusMap: Record<WorkflowTimelineEvent["status"], { dotColor: string; labelBg: string; labelColor: string; label: string }> = {
+  done:    { dotColor: "var(--color-green)",   labelBg: "var(--color-green-bg)",   labelColor: "var(--color-green)",   label: "Done" },
+  current: { dotColor: "var(--color-blue)",    labelBg: "var(--color-blue-bg)",    labelColor: "var(--color-blue)",    label: "Current" },
+  pending: { dotColor: "var(--color-yellow)",  labelBg: "var(--color-yellow-bg)",  labelColor: "var(--color-yellow)",  label: "Pending" },
+  info:    { dotColor: "var(--color-text-muted)", labelBg: "var(--color-bg)", labelColor: "var(--color-text-secondary)", label: "Info" },
 };
 
 export function CaseTimeline({
@@ -17,34 +17,87 @@ export function CaseTimeline({
   assigneeRole?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <h3 className="font-semibold text-slate-900">Case timeline</h3>
-        <span className="text-xs text-slate-500">{events.length} events</span>
+    <div
+      style={{
+        background: "var(--color-white)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-md)",
+        padding: "16px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <p style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+          Case Timeline
+        </p>
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+          {events.length} events
+        </span>
       </div>
-      <ol className="space-y-3">
+
+      <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {events.map((event, idx) => {
-          const styles = timelineStatusStyles[event.status];
+          const s = statusMap[event.status];
           return (
-            <li key={event.id} className="relative pl-6">
-              <span className={`absolute left-0 top-2 h-2.5 w-2.5 rounded-full ${styles.dot}`} />
+            <li key={event.id} style={{ position: "relative", paddingLeft: 20, paddingBottom: idx < events.length - 1 ? 14 : 0 }}>
+              {/* Dot */}
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 4,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: s.dotColor,
+                  display: "block",
+                }}
+              />
+              {/* Connector line */}
               {idx < events.length - 1 && (
-                <span className="absolute left-1 top-5 h-full w-px bg-slate-200" aria-hidden="true" />
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 3,
+                    top: 14,
+                    width: 1,
+                    height: "calc(100% - 6px)",
+                    background: "var(--color-border)",
+                    display: "block",
+                  }}
+                  aria-hidden="true"
+                />
               )}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{event.title}</p>
-                  {event.detail && <p className="text-xs text-slate-600 mt-0.5">{event.detail}</p>}
+
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 4 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontSize: "var(--font-size-base)", fontWeight: 500, color: "var(--color-text-primary)", marginBottom: event.detail ? 2 : 0 }}>
+                    {event.title}
+                  </p>
+                  {event.detail && (
+                    <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>{event.detail}</p>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-slate-500">{event.timestamp}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${styles.badge}`}>
-                    {styles.label}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                    {event.timestamp}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "var(--font-size-xs)",
+                      fontWeight: 500,
+                      padding: "1px 7px",
+                      borderRadius: "var(--radius-xs)",
+                      background: s.labelBg,
+                      color: s.labelColor,
+                    }}
+                  >
+                    {s.label}
                   </span>
                 </div>
               </div>
+
               {event.meta && event.meta.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                   {event.meta.map((item, i) => {
                     const isAssignee = item.label.toLowerCase() === "assignee";
                     const value = isAssignee && assigneeName
@@ -53,9 +106,16 @@ export function CaseTimeline({
                     return (
                       <span
                         key={`${event.id}-meta-${i}`}
-                        className="text-xs text-slate-600 bg-white border border-slate-200 rounded-full px-2 py-0.5"
+                        style={{
+                          fontSize: "var(--font-size-xs)",
+                          color: "var(--color-text-secondary)",
+                          background: "var(--color-bg)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "var(--radius-xs)",
+                          padding: "1px 7px",
+                        }}
                       >
-                        <strong className="font-medium text-slate-700">{item.label}:</strong> {value}
+                        <strong style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{item.label}:</strong>{" "}{value}
                       </span>
                     );
                   })}

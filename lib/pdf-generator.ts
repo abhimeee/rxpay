@@ -5,7 +5,8 @@
 
 export type PdfLine = {
     text: string;
-    highlight?: boolean;
+    highlight?: boolean;      // verified/extracted field → green tint
+    inconsistency?: boolean;  // AI-flagged issue → yellow highlight
 };
 
 const padPdfOffset = (offset: number) => String(offset).padStart(10, "0");

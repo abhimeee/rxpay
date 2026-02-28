@@ -21,21 +21,9 @@ const formatBytes = (bytes: number) => {
 };
 
 const getConfidenceTone = (confidence: number) => {
-  if (confidence >= 90) {
-    return {
-      row: "border-green-200 bg-green-50/80",
-    };
-  }
-
-  if (confidence >= 80) {
-    return {
-      row: "border-amber-200 bg-amber-50/80",
-    };
-  }
-
-  return {
-    row: "border-red-200 bg-red-50/80",
-  };
+  if (confidence >= 90) return { border: "var(--color-green)", bg: "var(--color-green-bg)" };
+  if (confidence >= 80) return { border: "var(--color-yellow)", bg: "var(--color-yellow-bg)" };
+  return { border: "var(--color-red)", bg: "var(--color-red-bg)" };
 };
 
 const initialFields: ExtractedField[] = [
@@ -103,32 +91,10 @@ const demoExtraction = (fileName: string): ExtractedField[] => {
     { key: "hospitalCity", label: "Hospital City", value: "Bengaluru", confidence: 96, required: true },
     { key: "networkHospital", label: "Network Hospital (Y/N)", value: "Y", confidence: 98, required: true },
     { key: "admissionDate", label: "Admission Date", value: "2026-02-21", confidence: 92, required: true },
-    {
-      key: "diagnosis",
-      label: "Diagnosis",
-      value: isCardiac ? "Coronary artery disease" : isOrtho ? "ACL tear (right knee)" : "Acute appendicitis",
-      confidence: 90,
-      required: true,
-    },
-    {
-      key: "procedure",
-      label: "Procedure",
-      value: isCardiac ? "Coronary angioplasty" : isOrtho ? "Arthroscopic ACL reconstruction" : "Laparoscopic appendectomy",
-      confidence: 93,
-      required: true,
-    },
-    {
-      key: "icdCode",
-      label: "ICD-10 Code",
-      value: isCardiac ? "I25.10" : isOrtho ? "S83.511A" : "K35.80",
-      confidence: 84,
-    },
-    {
-      key: "procedureCode",
-      label: "Procedure Code",
-      value: isCardiac ? "CPT-92928" : isOrtho ? "CPT-29888" : "CPT-44970",
-      confidence: 82,
-    },
+    { key: "diagnosis", label: "Diagnosis", value: isCardiac ? "Coronary artery disease" : isOrtho ? "ACL tear (right knee)" : "Acute appendicitis", confidence: 90, required: true },
+    { key: "procedure", label: "Procedure", value: isCardiac ? "Coronary angioplasty" : isOrtho ? "Arthroscopic ACL reconstruction" : "Laparoscopic appendectomy", confidence: 93, required: true },
+    { key: "icdCode", label: "ICD-10 Code", value: isCardiac ? "I25.10" : isOrtho ? "S83.511A" : "K35.80", confidence: 84 },
+    { key: "procedureCode", label: "Procedure Code", value: isCardiac ? "CPT-92928" : isOrtho ? "CPT-29888" : "CPT-44970", confidence: 82 },
     { key: "claimAmount", label: "Claim Amount", value: isCardiac ? "235000" : isOrtho ? "186000" : "124500", confidence: 96, required: true },
     { key: "nonPayableAmount", label: "Non-payable Amount (INR)", value: isCardiac ? "22000" : isOrtho ? "14000" : "9500", confidence: 86 },
     { key: "finalPayableAmount", label: "Final Payable Amount (INR)", value: isCardiac ? "213000" : isOrtho ? "172000" : "115000", confidence: 91, required: true },
@@ -157,9 +123,7 @@ export default function ReimbursementsPage() {
       const merged = [...current];
       next.forEach((file) => {
         const key = `${file.name}-${file.size}`;
-        if (!seen.has(key)) {
-          merged.push(file);
-        }
+        if (!seen.has(key)) merged.push(file);
       });
       return merged.slice(0, 5);
     });
@@ -173,18 +137,13 @@ export default function ReimbursementsPage() {
 
   const handleExtract = () => {
     if (!files.length) return;
-
     setWorkflow("extracting");
     setProgress(8);
     setSubmitMessage("");
-
     const progressSteps = [14, 26, 39, 53, 68, 82, 93, 100];
     progressSteps.forEach((value, index) => {
-      setTimeout(() => {
-        setProgress(value);
-      }, 500 + index * 520);
+      setTimeout(() => setProgress(value), 500 + index * 520);
     });
-
     setTimeout(() => {
       setExtractedFields(demoExtraction(files[0].name));
       setWorkflow("review");
@@ -194,13 +153,7 @@ export default function ReimbursementsPage() {
   const updateField = (key: string, value: string) => {
     setExtractedFields((current) =>
       current.map((field) =>
-        field.key === key
-          ? {
-              ...field,
-              value,
-              confidence: Math.max(field.confidence, 95),
-            }
-          : field
+        field.key === key ? { ...field, value, confidence: Math.max(field.confidence, 95) } : field
       )
     );
   };
@@ -209,247 +162,366 @@ export default function ReimbursementsPage() {
     if (hasMissingRequired) return;
     setWorkflow("submitting");
     setSubmitMessage("");
-
     setTimeout(() => {
       setWorkflow("submitted");
       setSubmitMessage("Claim draft submitted to the reimbursement portal. The reviewer can now finalize and dispatch.");
     }, 1200);
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <PageHeader
-        title="Reimbursements"
-        subtitle="Upload pre-auth forms and let AI auto-fill reimbursement portal rows for review."
-        titleVariant="navy"
-      />
+  const workflowStatusDef = {
+    submitted: { label: "Submitted", bg: "var(--color-green-bg)", color: "var(--color-green)" },
+    review: { label: "Ready for review", bg: "var(--color-blue-bg)", color: "var(--color-blue)" },
+    extracting: { label: "Extracting", bg: "var(--color-yellow-bg)", color: "var(--color-yellow)" },
+    idle: { label: "Waiting", bg: "var(--color-bg)", color: "var(--color-text-muted)" },
+    submitting: { label: "Submitting", bg: "var(--color-yellow-bg)", color: "var(--color-yellow)" },
+  };
+  const statusDef = workflowStatusDef[workflow];
 
-      <div className="p-8">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1.15fr_1.85fr]">
-          <section className="space-y-6">
-            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Step 1</p>
-                  <h3 className="mt-1 text-2xl font-bold text-slate-900">Upload pre-auth forms</h3>
-                  <p className="mt-2 text-base text-slate-500">Drop a PDF or image. We will extract relevant claim details for portal entry.</p>
-                </div>
+  const cardStyle: React.CSSProperties = {
+    background: "var(--color-white)",
+    border: "1px solid var(--color-border)",
+    borderRadius: "var(--radius-md)",
+    padding: "20px",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "7px 10px",
+    fontSize: "var(--font-size-base)",
+    border: "1px solid var(--color-border)",
+    borderRadius: "var(--radius-sm)",
+    background: "var(--color-white)",
+    color: "var(--color-text-primary)",
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
+  const btnPrimary: React.CSSProperties = {
+    padding: "7px 16px",
+    fontSize: "var(--font-size-base)",
+    fontWeight: 500,
+    background: "var(--color-black)",
+    color: "var(--color-white)",
+    border: "none",
+    borderRadius: "var(--radius-sm)",
+    cursor: "pointer",
+    transition: "opacity 0.15s",
+  };
+
+  const btnSecondary: React.CSSProperties = {
+    padding: "7px 16px",
+    fontSize: "var(--font-size-base)",
+    fontWeight: 500,
+    background: "var(--color-white)",
+    color: "var(--color-text-primary)",
+    border: "1px solid var(--color-border)",
+    borderRadius: "var(--radius-sm)",
+    cursor: "pointer",
+    transition: "background 0.15s",
+  };
+
+  return (
+    <div style={{ background: "var(--color-bg)", minHeight: "100vh" }}>
+      <PageHeader title="Reimbursements" />
+
+      <div style={{ padding: "20px" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1.6fr",
+            gap: 20,
+            maxWidth: 1200,
+          }}
+        >
+          {/* Left column */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Upload card */}
+            <div style={cardStyle}>
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Step 1
+                </p>
+                <p style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+                  Upload pre-auth forms
+                </p>
+                <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-secondary)" }}>
+                  Drop a PDF or image. AI will extract relevant claim details.
+                </p>
               </div>
 
+              {/* Drop zone */}
               <label
                 htmlFor="reimbursement-files"
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setIsDragging(true);
-                }}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setIsDragging(false);
-                  if (event.dataTransfer.files.length > 0) {
-                    addFiles(event.dataTransfer.files);
-                  }
+                onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files); }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  padding: "28px 20px",
+                  border: `1px dashed ${isDragging ? "var(--color-black)" : "var(--color-border-dark)"}`,
+                  borderRadius: "var(--radius-md)",
+                  background: isDragging ? "var(--color-bg-hover)" : "var(--color-bg)",
+                  cursor: "pointer",
+                  textAlign: "center",
+                  transition: "all 0.1s",
+                  marginBottom: 12,
                 }}
-                className={`mt-5 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition ${
-                  isDragging
-                    ? "border-teal-500 bg-teal-50 text-teal-700"
-                    : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
-                }`}
               >
-                <input
-                  id="reimbursement-files"
-                  type="file"
-                  multiple
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files) addFiles(event.target.files);
-                  }}
+                <input id="reimbursement-files" type="file" multiple accept=".pdf,.png,.jpg,.jpeg" style={{ display: "none" }}
+                  onChange={(e) => { if (e.target.files) addFiles(e.target.files); }}
                 />
-                <div className="rounded-full bg-white p-3 shadow-sm">
-                  <svg className="h-6 w-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 0L8 12m4-4l4 4M20 16.5V19a2 2 0 01-2 2H6a2 2 0 01-2-2v-2.5" />
-                  </svg>
-                </div>
+                <svg style={{ width: 20, height: 20, color: "var(--color-text-muted)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 0L8 12m4-4l4 4M20 16.5V19a2 2 0 01-2 2H6a2 2 0 01-2-2v-2.5" />
+                </svg>
                 <div>
-                  <p className="text-lg font-semibold">Drag and drop files here</p>
-                  <p className="text-sm text-slate-400">or click to browse</p>
+                  <p style={{ fontSize: "var(--font-size-base)", fontWeight: 500, color: "var(--color-text-primary)" }}>
+                    Drag and drop files here
+                  </p>
+                  <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: 2 }}>
+                    or click to browse · PDF, PNG, JPG
+                  </p>
                 </div>
               </label>
 
-              <div className="mt-5 space-y-3">
-                {files.length === 0 ? (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-base text-slate-500">No files selected.</div>
-                ) : (
-                  files.map((file, index) => (
-                    <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-xl border border-slate-100 bg-white px-4 py-3 text-base">
+              {/* File list */}
+              {files.length === 0 ? (
+                <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-muted)", padding: "8px 0" }}>No files selected.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                  {files.map((file, index) => (
+                    <div key={`${file.name}-${index}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "8px 12px",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: "var(--radius-sm)",
+                        background: "var(--color-white)",
+                      }}
+                    >
                       <div>
-                        <p className="font-semibold text-slate-800">{file.name}</p>
-                        <p className="text-sm text-slate-400">{formatBytes(file.size)}</p>
+                        <p style={{ fontSize: "var(--font-size-base)", fontWeight: 500, color: "var(--color-text-primary)" }}>{file.name}</p>
+                        <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{formatBytes(file.size)}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                      <button type="button" onClick={() => removeFile(index)}
+                        style={{ ...btnSecondary, padding: "3px 10px", fontSize: "var(--font-size-xs)" }}
                       >
                         Remove
                       </button>
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
 
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">
-                  {files.length} files • {formatBytes(totalSize)}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                  {files.length} file{files.length !== 1 ? "s" : ""} · {formatBytes(totalSize)}
                 </p>
                 <button
                   type="button"
                   disabled={!files.length || workflow === "extracting" || workflow === "submitting"}
                   onClick={handleExtract}
-                  className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold uppercase tracking-widest text-white shadow-lg shadow-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  style={{ ...btnPrimary, opacity: (!files.length || workflow === "extracting" || workflow === "submitting") ? 0.4 : 1, cursor: (!files.length || workflow === "extracting" || workflow === "submitting") ? "not-allowed" : "pointer" }}
                 >
                   {workflow === "extracting" ? "Extracting..." : "Extract with AI"}
                 </button>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-              <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Flow</p>
-              <h3 className="mt-2 text-2xl font-bold text-slate-900">Smart intake pipeline</h3>
-              <div className="mt-4 space-y-3 text-base text-slate-600">
+            {/* Pipeline card */}
+            <div style={cardStyle}>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                Flow
+              </p>
+              <p style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 12 }}>
+                Smart intake pipeline
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
                   "Document upload and OCR",
                   "AI extraction of key reimbursement fields",
                   "Auto-fill of portal rows",
                   "Human review and final submission",
-                ].map((step) => (
-                  <div key={step} className="flex items-center gap-3">
-                    <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
-                    <span>{step}</span>
+                ].map((step, i) => (
+                  <div key={step} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--color-bg)", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", flexShrink: 0 }}>
+                      {i + 1}
+                    </span>
+                    <span style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-secondary)" }}>{step}</span>
                   </div>
                 ))}
               </div>
             </div>
-          </section>
+          </div>
 
-          <section className="space-y-6">
-            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Step 2</p>
-                  <h3 className="mt-1 text-2xl font-bold text-slate-900">AI extraction and portal fill</h3>
-                  <p className="mt-2 text-base text-slate-500">AI-filled fields are editable before submission.</p>
-                </div>
-                <span
-                  className={`rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wider ${
-                    workflow === "submitted"
-                      ? "bg-green-100 text-green-700"
-                      : workflow === "review"
-                        ? "bg-blue-100 text-blue-700"
-                        : workflow === "extracting"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {workflow === "submitted"
-                    ? "Submitted"
-                    : workflow === "review"
-                      ? "Ready for review"
-                      : workflow === "extracting"
-                        ? "Extracting"
-                        : "Waiting"}
-                </span>
+          {/* Right column */}
+          <div style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+              <div>
+                <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Step 2
+                </p>
+                <p style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+                  AI extraction & portal fill
+                </p>
+                <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-secondary)" }}>
+                  AI-filled fields are editable before submission.
+                </p>
               </div>
-
-              {workflow === "extracting" ? (
-                <div className="mt-5 rounded-2xl border border-teal-100 bg-gradient-to-r from-teal-50 to-slate-50 p-5">
-                  <div className="flex items-center justify-between text-base font-semibold text-slate-800">
-                    <span>AI is parsing form fields</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-teal-500 to-slate-700 transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <p className="mt-3 text-sm text-slate-600">Detecting patient details, policy references, clinical details, and billing values.</p>
-                </div>
-              ) : null}
-
-              {(workflow === "review" || workflow === "submitting" || workflow === "submitted") && (
-                <div className="mt-5">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {extractedFields.map((field) => {
-                      const confidenceTone = getConfidenceTone(field.confidence);
-
-                      return (
-                        <label key={field.key} className={`rounded-xl border p-3 ${confidenceTone.row}`}>
-                          <div className="mb-2">
-                            <span className="text-sm font-bold uppercase tracking-wide text-slate-600">{field.label}</span>
-                          </div>
-                          <input
-                            value={field.value}
-                            onChange={(event) => updateField(field.key, event.target.value)}
-                            placeholder={`Enter ${field.label.toLowerCase()}`}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-700 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-
-                  <label className="mt-4 block text-base font-semibold text-slate-600">
-                    Reviewer notes (optional)
-                    <textarea
-                      value={reviewNotes}
-                      onChange={(event) => setReviewNotes(event.target.value)}
-                      rows={3}
-                      placeholder="Any corrections or comments for final processing..."
-                      className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-700 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                    />
-                  </label>
-
-                  <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExtractedFields(initialFields);
-                        setWorkflow("idle");
-                        setProgress(0);
-                        setSubmitMessage("");
-                      }}
-                      className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold uppercase tracking-widest text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
-                    >
-                      Start over
-                    </button>
-                    <button
-                      type="button"
-                      disabled={workflow === "submitting" || hasMissingRequired}
-                      onClick={handleSubmit}
-                      className="rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-bold uppercase tracking-widest text-white shadow-lg shadow-teal-200 transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-slate-400"
-                    >
-                      {workflow === "submitting" ? "Submitting..." : "Submit to portal"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {workflow === "idle" && (
-                <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
-                  <p className="text-lg font-semibold text-slate-700">Upload a pre-auth form to begin.</p>
-                  <p className="mt-1 text-base text-slate-500">AI extracted fields will appear here for quick review and correction.</p>
-                </div>
-              )}
-
-              {submitMessage ? (
-                <div className="mt-4 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-base text-green-700">
-                  {submitMessage}
-                </div>
-              ) : null}
+              <span
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: "var(--radius-xs)",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: 500,
+                  background: statusDef.bg,
+                  color: statusDef.color,
+                  flexShrink: 0,
+                }}
+              >
+                {statusDef.label}
+              </span>
             </div>
-          </section>
+
+            {/* Extraction progress */}
+            {workflow === "extracting" && (
+              <div style={{ padding: "14px 16px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: "var(--font-size-base)", fontWeight: 500, color: "var(--color-text-primary)" }}>
+                  <span>AI is parsing form fields</span>
+                  <span>{progress}%</span>
+                </div>
+                <div style={{ height: 4, background: "var(--color-border)", borderRadius: 99, overflow: "hidden" }}>
+                  <div
+                    style={{ height: "100%", width: `${progress}%`, background: "var(--color-black)", borderRadius: 99, transition: "width 0.3s ease" }}
+                  />
+                </div>
+                <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: 8 }}>
+                  Detecting patient details, policy references, clinical details, and billing values.
+                </p>
+              </div>
+            )}
+
+            {/* Review fields */}
+            {(workflow === "review" || workflow === "submitting" || workflow === "submitted") && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                    marginBottom: 14,
+                    maxHeight: 420,
+                    overflowY: "auto",
+                    paddingRight: 4,
+                  }}
+                >
+                  {extractedFields.map((field) => {
+                    const tone = getConfidenceTone(field.confidence);
+                    return (
+                      <label
+                        key={field.key}
+                        style={{
+                          display: "block",
+                          padding: "8px 10px",
+                          border: `1px solid ${field.confidence > 0 ? tone.border + "55" : "var(--color-border)"}`,
+                          borderRadius: "var(--radius-sm)",
+                          background: field.confidence > 0 ? tone.bg + "44" : "var(--color-white)",
+                        }}
+                      >
+                        <p style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                          {field.label}{field.required && <span style={{ color: "var(--color-red)", marginLeft: 2 }}>*</span>}
+                        </p>
+                        <input
+                          value={field.value}
+                          onChange={(e) => updateField(field.key, e.target.value)}
+                          placeholder={`Enter ${field.label.toLowerCase()}`}
+                          style={inputStyle}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <label style={{ display: "block", marginBottom: 14 }}>
+                  <p style={{ fontSize: "var(--font-size-sm)", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: 4 }}>
+                    Reviewer notes (optional)
+                  </p>
+                  <textarea
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Any corrections or comments for final processing..."
+                    style={{ ...inputStyle, resize: "none", fontFamily: "inherit" }}
+                  />
+                </label>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => { setExtractedFields(initialFields); setWorkflow("idle"); setProgress(0); setSubmitMessage(""); }}
+                    style={btnSecondary}
+                  >
+                    Start over
+                  </button>
+                  <button
+                    type="button"
+                    disabled={workflow === "submitting" || hasMissingRequired}
+                    onClick={handleSubmit}
+                    style={{
+                      ...btnPrimary,
+                      background: "var(--color-accent)",
+                      opacity: (workflow === "submitting" || hasMissingRequired) ? 0.4 : 1,
+                      cursor: (workflow === "submitting" || hasMissingRequired) ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {workflow === "submitting" ? "Submitting..." : "Submit to portal"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Idle state */}
+            {workflow === "idle" && (
+              <div
+                style={{
+                  border: "1px dashed var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--color-bg)",
+                  padding: "40px 20px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: "var(--font-size-base)", fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 4 }}>
+                  Upload a pre-auth form to begin.
+                </p>
+                <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-muted)" }}>
+                  AI extracted fields will appear here for quick review and correction.
+                </p>
+              </div>
+            )}
+
+            {/* Success message */}
+            {submitMessage && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 14px",
+                  background: "var(--color-green-bg)",
+                  border: "1px solid var(--color-green)",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "var(--font-size-base)",
+                  color: "var(--color-green)",
+                }}
+              >
+                {submitMessage}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

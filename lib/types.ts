@@ -130,6 +130,8 @@ export interface CodingItem {
   description: string;
   status: "valid" | "mismatch" | "missing_specificity";
   suggestion?: string;
+  clinicalContext?: string;  // Quoted text from source document
+  diagnosisMatch?: string;   // Plain-English compatibility note
 }
 
 export interface MedicalNecessityItem {
@@ -160,6 +162,37 @@ export interface FraudRedFlag {
   severity: "high" | "medium" | "low" | "none";
   description: string;
   resolved?: boolean;
+  providerFraudRate?: number;   // e.g. 2.3 (percent)
+  patientClaimsCount?: number;  // e.g. 3
+}
+
+export type SectionStatus = "pending" | "in_progress" | "done" | "needs_attention";
+
+// UI tab identifiers — 6 tabs replacing the old 5-stage view
+export type UiTab =
+  | "policy_id_docs"
+  | "medical_docs"
+  | "medical_coding"
+  | "medical_necessity"
+  | "fraud_anomaly"
+  | "queries_and_decision";
+
+// Maps UiTab → WorkflowStageId for section status tracking
+export const UI_TAB_TO_STAGE: Record<UiTab, WorkflowStageId> = {
+  policy_id_docs: "documentation",
+  medical_docs: "documentation",
+  medical_coding: "medical_coding",
+  medical_necessity: "medical_necessity",
+  fraud_anomaly: "fraud_anomaly",
+  queries_and_decision: "queries_and_decision",
+};
+
+export interface CrossTabQuery {
+  id: string;
+  sourceTab: UiTab;
+  sourceLabel: string;
+  question: string;
+  createdAt: string;
 }
 
 export interface WorkflowQuery {

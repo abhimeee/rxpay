@@ -215,6 +215,10 @@ export default function PreAuthQueuePage() {
           </div>
         </div>
 
+        <p style={{ fontSize: "var(--font-size-sm, 14px)", color: "var(--color-text-muted)", marginBottom: 16 }}>
+          We are pulling all these cases from emails received on <strong>claims@aknatpa.com</strong>.
+        </p>
+
         {/* Data table */}
         <div
           style={{

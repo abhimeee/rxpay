@@ -64,11 +64,30 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     coding: {
       icd10: [
-        { id: "icd1", type: "icd10", code: "I21.9", description: "Acute myocardial infarction, unspecified", status: "valid" },
+        {
+          id: "icd1", type: "icd10", code: "I21.9",
+          description: "Acute myocardial infarction, unspecified",
+          status: "valid",
+          clinicalContext: "\"Patient presented with acute chest pain radiating to left arm, elevated troponin (2.4× ULN), ST-elevation in V1–V4 on 12-lead ECG.\" — Consultation notes, p.2",
+          diagnosisMatch: "Matches procedure — I21.9 is the standard indication for percutaneous coronary intervention",
+          suggestion: "Consider I21.01 (STEMI of anterior wall) for greater specificity if LAD involvement confirmed",
+        },
       ],
       cpt: [
-        { id: "cpt1", type: "cpt", code: "93454", description: "Catheter placement, coronary angiography", status: "valid" },
-        { id: "cpt2", type: "cpt", code: "92928", description: "Percutaneous transcatheter placement, stent", status: "valid" },
+        {
+          id: "cpt1", type: "cpt", code: "93454",
+          description: "Catheter placement in coronary artery for coronary angiography",
+          status: "valid",
+          clinicalContext: "\"Pre-procedure angiography performed to assess coronary anatomy and degree of stenosis before stent placement.\" — Operative note, p.1",
+          diagnosisMatch: "Standard diagnostic step prior to stenting in STEMI protocol",
+        },
+        {
+          id: "cpt2", type: "cpt", code: "92928",
+          description: "Percutaneous transcatheter placement of intracoronary stent(s), with coronary angioplasty",
+          status: "valid",
+          clinicalContext: "\"PTCA with drug-eluting stent placed in LAD; 95% stenosis resolved to <10% post-procedure.\" — Procedure report, p.3",
+          diagnosisMatch: "Matches diagnosis — standard treatment for acute MI with significant coronary stenosis (I21.9 → 92928)",
+        },
       ],
     },
     medicalNecessity: [
@@ -105,8 +124,8 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
       },
     ],
     fraudFlags: [
-      { id: "f1", category: "document", severity: "low", description: "Timeline: symptoms 2 days; admission 1 day – consistent." },
-      { id: "f2", category: "provider", severity: "none", description: "Hospital in network; no prior fraud flags." },
+      { id: "f1", category: "document", severity: "low", description: "Timeline: symptoms 2 days; admission 1 day – consistent with acute STEMI presentation.", patientClaimsCount: 1 },
+      { id: "f2", category: "provider", severity: "none", description: "Hospital in network; no prior fraud flags on record.", providerFraudRate: 0.8 },
     ],
     queries: [
       { id: "q1", question: "Consent form with patient signature not received.", status: "open", dueDate: "2025-02-04" },

@@ -1,106 +1,207 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --primary: #0d9488;
-  --primary-dark: #0f766e;
-  --primary-light: #ccfbf1;
-  --accent: #0369a1;
-  --sidebar: #0f172a;
-  --card: #ffffff;
-  --border: #e2e8f0;
-  --muted: #64748b;
-  --success: #059669;
-  --warning: #d97706;
-  --danger: #dc2626;
+  /* Colors - Core */
+  --color-accent: #E5001B;
+  --color-black: #111111;
+  --color-white: #FFFFFF;
+
+  /* Colors - Backgrounds */
+  --color-bg: #F5F5F5;
+  --color-bg-hover: #F0F0F0;
+  --color-bg-selected: #F5F5F5;
+
+  /* Colors - Text */
+  --color-text-primary: #111111;
+  --color-text-secondary: #555555;
+  --color-text-muted: #999999;
+  --color-text-disabled: #CCCCCC;
+
+  /* Colors - Borders */
+  --color-border: #E5E5E5;
+  --color-border-dark: #CCCCCC;
+
+  /* Colors - Semantic */
+  --color-green: #18A558;
+  --color-green-bg: #EDF7F1;
+  --color-yellow: #D97706;
+  --color-yellow-bg: #FEF3C7;
+  --color-red: #E5001B;
+  --color-red-bg: #FEF0F0;
+  --color-blue: #1A6FDE;
+  --color-blue-bg: #EEF4FD;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size-base: 13px;
+  --font-size-sm: 12px;
+  --font-size-xs: 11px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Border Radius */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-none: none;
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.10);
+
+  /* Layout */
+  --sidebar-width: 220px;
+  --topbar-height: 44px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text-primary);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 17px;
-  line-height: 1.6;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar for sidebar */
-.sidebar-scroll::-webkit-scrollbar {
+/* Scrollbar */
+::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
-.sidebar-scroll::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
   border-radius: 3px;
 }
 
-/* Status badges */
-.badge-compliant { @apply bg-emerald-100 text-emerald-800 border border-emerald-200; }
-.badge-partial { @apply bg-amber-100 text-amber-800 border border-amber-200; }
-.badge-non_compliant { @apply bg-red-100 text-red-800 border border-red-200; }
-.badge-pending_review { @apply bg-slate-100 text-slate-700 border border-slate-200; }
+/* Badge base */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 1.4;
+}
 
-.badge-high { @apply bg-red-100 text-red-800; }
-.badge-medium { @apply bg-amber-100 text-amber-800; }
-.badge-low { @apply bg-slate-100 text-slate-600; }
+/* Status badge variants — Valley tokens */
+.badge-green { background: var(--color-green-bg); color: var(--color-green); }
+.badge-yellow { background: var(--color-yellow-bg); color: var(--color-yellow); }
+.badge-red { background: var(--color-red-bg); color: var(--color-red); }
+.badge-blue { background: var(--color-blue-bg); color: var(--color-blue); }
+.badge-muted { background: var(--color-bg); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
 
-/* Pre-auth workflow stage entrance */
+/* Legacy badge names kept for StatusBadge.tsx compatibility */
+.badge-compliant { background: var(--color-green-bg); color: var(--color-green); }
+.badge-partial { background: var(--color-yellow-bg); color: var(--color-yellow); }
+.badge-non_compliant { background: var(--color-red-bg); color: var(--color-red); }
+.badge-pending_review { background: var(--color-bg); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+.badge-high { background: var(--color-red-bg); color: var(--color-red); }
+.badge-medium { background: var(--color-yellow-bg); color: var(--color-yellow); }
+.badge-low { background: var(--color-bg); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+
+/* Valley nav item */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.nav-item:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+.nav-item.active {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* Valley filter chip */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.filter-chip:hover {
+  background: var(--color-bg-hover);
+}
+.filter-chip.active {
+  background: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-black);
+}
+
+/* Valley card hover */
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Restrained animations */
 @keyframes workflow-fade-slide {
-  from {
-    opacity: 0;
-    transform: translateX(0.75rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(6px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 .workflow-stage-content {
-  animation: workflow-fade-slide 0.3s ease-out;
+  animation: workflow-fade-slide 0.15s ease-out;
 }
 
-/* Minimal metric animations for dashboard */
 @keyframes metric-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes metric-fill {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
-.metric-rise {
-  animation: metric-rise 0.5s ease-out;
-}
-
-.metric-fill {
-  transform-origin: left;
-  animation: metric-fill 0.8s ease-out;
-}
+.metric-rise { animation: metric-rise 0.15s ease-out; }
+.metric-fill { transform-origin: left; animation: metric-fill 0.5s ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
   .metric-rise,
-  .metric-fill {
-    animation: none;
-  }
+  .metric-fill,
+  .workflow-stage-content { animation: none; }
 }
