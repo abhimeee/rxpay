@@ -1287,8 +1287,7 @@ export function getWorkflowData(preAuthId: string): PreAuthWorkflowData | null {
 }
 
 export const WORKFLOW_STAGES: { id: WorkflowStageId; title: string; shortTitle: string; description: string }[] = [
-  { id: "documentation", shortTitle: "Docs", title: "Documentation Completeness", description: "Verify completeness against IRDAI checklist." },
-  { id: "eligibility", shortTitle: "Eligibility", title: "Eligibility & Coverage", description: "Policy status, dates, service coverage, limits, waiting period." },
+  { id: "documentation", shortTitle: "Docs", title: "Documentation & Eligibility", description: "Verify completeness, review documents, and check eligibility." },
   { id: "medical_coding", shortTitle: "Coding", title: "Medical Coding Accuracy", description: "ICD-10 and CPT validation." },
   { id: "medical_necessity", shortTitle: "Necessity", title: "Medical Necessity", description: "IRDAI → insurer policy → clinical criteria." },
   { id: "fraud_anomaly", shortTitle: "Fraud", title: "Fraud & Anomaly", description: "Red flags and pattern checks." },

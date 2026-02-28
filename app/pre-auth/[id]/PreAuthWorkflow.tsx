@@ -149,7 +149,7 @@ export function PreAuthWorkflow({
   const canApprove = docScore >= 80 && (localWorkflowData?.queries.length ?? 0) === 0;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden min-w-0">
+    <div className="rounded-md border border-[#E5E5E5] bg-white overflow-hidden min-w-0">
       {/* Progress bar */}
       <div className="h-1.5 bg-slate-100 overflow-hidden min-w-0">
         <div
@@ -160,7 +160,7 @@ export function PreAuthWorkflow({
 
       <div className="flex flex-col lg:flex-row min-w-0">
         {/* Stepper */}
-        <div className="border-b lg:border-b-0 lg:border-r border-slate-200 bg-slate-50/80 p-4 lg:w-52 shrink-0 min-w-0">
+        <div className="border-b lg:border-b-0 lg:border-r border-[#E5E5E5] bg-[#F5F5F5]/80 p-4 lg:w-52 shrink-0 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
             Workflow
           </p>
@@ -168,26 +168,54 @@ export function PreAuthWorkflow({
             {WORKFLOW_STAGES.map((stage, idx) => {
               const isCompleted = completedSteps.includes(idx);
               const isActive = idx === currentStep;
+
+              // Compute status label
+              let statusLabel = "";
+              let statusColor = "";
+              if (isCompleted) {
+                statusLabel = "";
+              } else if (idx === currentStep) {
+                if (stage.id === "documentation") {
+                  const total = (analysisResult ?? checklist).length;
+                  const submitted = checklist.filter((c) => c.status !== "missing").length;
+                  statusLabel = `${submitted}/${total} docs`;
+                  statusColor = "text-blue-400";
+                } else {
+                  statusLabel = "In Progress";
+                  statusColor = "text-blue-400";
+                }
+              } else if (idx > currentStep) {
+                statusLabel = "Pending";
+                statusColor = isActive ? "text-white/50" : "text-slate-400";
+              }
+
               return (
                 <button
                   key={stage.id}
                   type="button"
                   onClick={() => setCurrentStep(idx)}
                   className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-all duration-200 ${isActive
-                    ? "bg-teal-600 text-white shadow-md font-medium"
+                    ? "bg-[#111111] text-white font-medium"
                     : isCompleted
-                      ? "bg-teal-50 text-teal-800 hover:bg-teal-100"
+                      ? "bg-teal-50 text-[#18A558] hover:bg-[#EDF7F1]"
                       : "text-slate-600 hover:bg-slate-100"
                     }`}
                 >
                   <span className="inline-flex items-center gap-2">
                     <span
-                      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${isActive ? "bg-white/20" : isCompleted ? "bg-teal-200 text-teal-800" : "bg-slate-200 text-slate-600"
+                      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${isActive ? "bg-white/20" : isCompleted ? "bg-teal-200 text-[#18A558]" : "bg-slate-200 text-slate-600"
                         }`}
                     >
                       {isCompleted ? "✓" : idx + 1}
                     </span>
-                    {stage.shortTitle}
+                    <span className="flex flex-col min-w-0">
+                      <span>{stage.shortTitle}</span>
+                      {statusLabel && (
+                        <span className={`text-[10px] font-medium leading-tight ${isActive ? "text-white/60" : statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      )}
+                    </span>
                   </span>
                 </button>
               );
@@ -203,7 +231,7 @@ export function PreAuthWorkflow({
             style={{ animationDelay: "0ms" }}
           >
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-[#111111]">
                 {WORKFLOW_STAGES[currentStep].title}
               </h2>
               <p className="text-sm text-slate-500 mt-0.5">
@@ -212,7 +240,7 @@ export function PreAuthWorkflow({
             </div>
 
 
-            {/* Stage 2: Documentation */}
+            {/* Stage 1: Documentation & Eligibility */}
             {stageId === "documentation" && (
               <div className="space-y-4">
                 <AnalysisFlow
@@ -232,6 +260,8 @@ export function PreAuthWorkflow({
                   sumInsured={sumInsured}
                   submittedAt={submittedAt}
                   onViewDoc={(item) => openDoc("Request Item", item)}
+                  eligibilityItems={localWorkflowData?.eligibility ?? []}
+                  onEligibilityStatusChange={updateEligibilityStatus}
                 />
                 <p className="text-xs text-slate-500">
                   Decision within 1 hour of complete documentation. Missing items require query to hospital.
@@ -239,18 +269,7 @@ export function PreAuthWorkflow({
               </div>
             )}
 
-            {/* Stage 3: Eligibility */}
-            {stageId === "eligibility" && (localWorkflowData ? (
-              <EligibilityContent
-                items={localWorkflowData.eligibility}
-                onViewDoc={(item) => openDoc("Eligibility", item)}
-                onStatusChange={updateEligibilityStatus}
-              />
-            ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
-            ))}
-
-            {/* Stage 4: Medical Coding */}
+            {/* Stage 2: Medical Coding */}
             {stageId === "medical_coding" && (localWorkflowData ? (
               <CodingContent
                 coding={localWorkflowData.coding}
@@ -258,10 +277,10 @@ export function PreAuthWorkflow({
                 onStatusChange={updateCodingStatus}
               />
             ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
+              <div className="rounded-md border border-[#E5E5E5] bg-[#F5F5F5] p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
             ))}
 
-            {/* Stage 5: Medical Necessity */}
+            {/* Stage 3: Medical Necessity */}
             {stageId === "medical_necessity" && (localWorkflowData ? (
               <MedicalNecessityContent
                 items={localWorkflowData.medicalNecessity}
@@ -272,20 +291,20 @@ export function PreAuthWorkflow({
                 onInsightStatusChange={updateInsightStatus}
               />
             ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
+              <div className="rounded-md border border-[#E5E5E5] bg-[#F5F5F5] p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
             ))}
 
-            {/* Stage 6: Fraud & Anomaly */}
+            {/* Stage 4: Fraud & Anomaly */}
             {stageId === "fraud_anomaly" && (localWorkflowData ? (
               <FraudSection
                 flags={localWorkflowData.fraudFlags}
                 onViewDoc={(item) => openDoc("Fraud & Anomaly", item)}
               />
             ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
+              <div className="rounded-md border border-[#E5E5E5] bg-[#F5F5F5] p-6 text-center text-slate-500">Workflow demo data not loaded.</div>
             ))}
 
-            {/* Stage 7: Queries & Decision (merged) */}
+            {/* Stage 5: Queries & Decision */}
             {stageId === "queries_and_decision" && (
               <div className="space-y-6">
                 {localWorkflowData ? (
@@ -294,7 +313,7 @@ export function PreAuthWorkflow({
                     onViewDoc={(item) => openDoc("Query", item)}
                   />
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-slate-500 text-sm">Workflow demo data not loaded.</div>
+                  <div className="rounded-md border border-[#E5E5E5] bg-[#F5F5F5] p-4 text-center text-slate-500 text-sm">Workflow demo data not loaded.</div>
                 )}
                 <DecisionContent
                   canApprove={canApprove}
@@ -310,12 +329,12 @@ export function PreAuthWorkflow({
 
           {/* Next / Previous */}
           {!isDecisionStep && (
-            <div className="flex items-center justify-between gap-4 px-6 pb-6 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-4 px-6 pb-6 pt-2 border-t border-[#E5E5E5]">
               <button
                 type="button"
                 onClick={goPrev}
                 disabled={currentStep === 0}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                className="inline-flex items-center gap-2 rounded-md border border-[#E5E5E5] bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#F5F5F5] disabled:opacity-40 disabled:pointer-events-none transition-colors"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -326,9 +345,9 @@ export function PreAuthWorkflow({
                 <button
                   type="button"
                   onClick={() => markStepComplete(currentStep)}
-                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-all duration-200 ${isStepCompleted
+                  className={`inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${isStepCompleted
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-teal-600 text-white hover:bg-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                    : "bg-[#111111] text-white hover:bg-[#111111] focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
                     }`}
                 >
                   {isStepCompleted ? (
@@ -345,7 +364,7 @@ export function PreAuthWorkflow({
                 <button
                   type="button"
                   onClick={goNext}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-md border border-[#E5E5E5] bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-[#F5F5F5] transition-colors"
                 >
                   {isLastStep ? "Queries & decision" : "Next step"}
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -381,15 +400,15 @@ function EligibilityContent({
       {items.map((item) => (
         <li
           key={item.id}
-          className="flex flex-wrap items-start justify-between gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50"
+          className="flex flex-wrap items-start justify-between gap-3 py-3 px-4 rounded-md border border-[#E5E5E5] bg-[#F5F5F5]"
         >
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-slate-900">{item.label}</p>
+            <p className="font-medium text-[#111111]">{item.label}</p>
             <p className="text-sm text-slate-600 mt-0.5">{item.value}</p>
             {item.detail && <p className="text-xs text-slate-500 mt-1">{item.detail}</p>}
             <button
               onClick={() => onViewDoc(item)}
-              className="mt-2.5 inline-flex items-center gap-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-tight"
+              className="mt-2.5 inline-flex items-center gap-2 text-[11px] font-bold text-[#18A558] hover:text-[#18A558] transition-colors uppercase tracking-tight"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -445,14 +464,14 @@ function CodingContent({
           {coding.icd10.map((item) => (
             <li
               key={item.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg bg-slate-50 border border-slate-100"
+              className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg bg-[#F5F5F5] border border-[#E5E5E5]"
             >
               <div>
                 <span className="font-mono font-medium text-slate-800">{item.code}</span>
                 <span className="text-slate-600 ml-2">{item.description}</span>
                 <button
                   onClick={() => onViewDoc(item)}
-                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#18A558] hover:text-[#18A558] transition-colors"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -491,14 +510,14 @@ function CodingContent({
           {coding.cpt.map((item) => (
             <li
               key={item.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg bg-slate-50 border border-slate-100"
+              className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg bg-[#F5F5F5] border border-[#E5E5E5]"
             >
               <div>
                 <span className="font-mono font-medium text-slate-800">{item.code}</span>
                 <span className="text-slate-600 ml-2">{item.description}</span>
                 <button
                   onClick={() => onViewDoc(item)}
-                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#18A558] hover:text-[#18A558] transition-colors"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -562,7 +581,7 @@ function MedicalNecessityContent({
   };
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-md border border-[#E5E5E5] bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-slate-700">Diagnosis ↔ procedure check</h3>
@@ -574,7 +593,7 @@ function MedicalNecessityContent({
         </div>
         <div className="mt-3 space-y-2">
           {insights.map((insight) => (
-            <details key={insight.id} className="group rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+            <details key={insight.id} className="group rounded-lg border border-[#E5E5E5] bg-[#F5F5F5]/60 px-3 py-2">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm text-slate-700">
                 <span className="font-medium text-slate-800">
                   {insight.diagnosisCode} → {insight.procedureCode}
@@ -621,7 +640,7 @@ function MedicalNecessityContent({
                   <p className="text-xs text-slate-500">{insight.aiSummary}</p>
                   <button
                     onClick={() => onViewDoc({ source: insight.sourceLabel, finding: insight.aiSummary, label: insight.sourceLabel })}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1 rounded-full border border-[#E5E5E5] bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-[#F5F5F5]"
                   >
                     {insight.sourceLabel}
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -641,15 +660,15 @@ function MedicalNecessityContent({
         {items.map((item) => (
           <li
             key={item.id}
-            className="flex flex-wrap items-start justify-between gap-3 py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50"
+            className="flex flex-wrap items-start justify-between gap-3 py-3 px-4 rounded-md border border-[#E5E5E5] bg-[#F5F5F5]"
           >
             <div className="flex-1 min-w-0">
               <span className="text-xs font-medium text-slate-500">Level {item.level}: {levelNames[item.level]}</span>
-              <p className="font-medium text-slate-900 mt-0.5">{item.source}</p>
+              <p className="font-medium text-[#111111] mt-0.5">{item.source}</p>
               <p className="text-sm text-slate-600">{item.finding}</p>
               <button
                 onClick={() => onViewDoc(item)}
-                className="mt-2.5 inline-flex items-center gap-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-tight"
+                className="mt-2.5 inline-flex items-center gap-2 text-[11px] font-bold text-[#18A558] hover:text-[#18A558] transition-colors uppercase tracking-tight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -698,7 +717,7 @@ function QueryContent({
 }) {
   if (queries.length === 0) {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-center">
+      <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-4 text-center">
         <p className="font-medium text-emerald-800">No open queries</p>
         <p className="text-sm text-emerald-700 mt-0.5">Documentation sufficient for decision or queries responded.</p>
       </div>
@@ -709,7 +728,7 @@ function QueryContent({
       {queries.map((q) => (
         <li
           key={q.id}
-          className="flex flex-wrap items-start justify-between gap-3 py-3 px-4 rounded-xl border border-amber-200 bg-amber-50/80"
+          className="flex flex-wrap items-start justify-between gap-3 py-3 px-4 rounded-md border border-amber-200 bg-amber-50/80"
         >
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-amber-900">Query</p>
@@ -719,7 +738,7 @@ function QueryContent({
             )}
             <button
               onClick={() => onViewDoc({ label: "Query Record", value: q.question })}
-              className="mt-2 inline-flex items-center gap-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-tight"
+              className="mt-2 inline-flex items-center gap-2 text-[11px] font-bold text-[#18A558] hover:text-[#18A558] transition-colors uppercase tracking-tight"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -758,7 +777,7 @@ function DecisionContent({
 }) {
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-md border border-[#E5E5E5] bg-[#F5F5F5] p-4">
         <p className="text-sm text-slate-600"><strong>Claim:</strong> {claimId}</p>
         <p className="text-sm text-slate-600"><strong>Procedure:</strong> {procedure}</p>
         <p className="text-sm text-slate-600"><strong>Estimated amount:</strong> {formatCurrency(estimatedAmount)}</p>
@@ -767,9 +786,9 @@ function DecisionContent({
 
       {
         decisionMade ? (
-          <div className="rounded-xl border-2 border-teal-300 bg-teal-50 p-5 text-center" >
+          <div className="rounded-md border-2 border-teal-300 bg-teal-50 p-5 text-center" >
             <p className="font-semibold text-teal-900 capitalize">Decision: {decisionMade}</p>
-            <p className="text-sm text-teal-700 mt-1">
+            <p className="text-sm text-[#18A558] mt-1">
               {decisionMade === "approve" && "Authorization number will be issued; validity 15 days."}
               {decisionMade === "deny" && "Denial reason and appeal rights will be communicated."}
               {decisionMade === "query" && "Specific queries sent to hospital; 7-day response deadline."}
@@ -782,7 +801,7 @@ function DecisionContent({
               type="button"
               onClick={() => onDecision("approve")}
               disabled={!canApprove}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -792,7 +811,7 @@ function DecisionContent({
             <button
               type="button"
               onClick={() => onDecision("deny")}
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 hover:border-red-300 focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition-colors"
+              className="inline-flex items-center gap-2 rounded-md border-2 border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 hover:border-red-300 focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition-colors"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -802,7 +821,7 @@ function DecisionContent({
             <button
               type="button"
               onClick={() => onDecision("query")}
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 hover:border-amber-300 focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 transition-colors"
+              className="inline-flex items-center gap-2 rounded-md border-2 border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 hover:border-amber-300 focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 transition-colors"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -812,7 +831,7 @@ function DecisionContent({
             <button
               type="button"
               onClick={() => onDecision("conditional")}
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-teal-200 bg-teal-50 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-300 focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 transition-colors"
+              className="inline-flex items-center gap-2 rounded-md border-2 border-[#C6E6D1] bg-teal-50 px-5 py-3 text-sm font-semibold text-[#18A558] hover:bg-[#EDF7F1] hover:border-teal-300 focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 transition-colors"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
