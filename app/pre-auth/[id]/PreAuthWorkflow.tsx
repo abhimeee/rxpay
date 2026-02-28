@@ -178,11 +178,6 @@ export function PreAuthWorkflow({
     setLocalWorkflowData({ ...localWorkflowData, eligibility: localWorkflowData.eligibility.map((item) => item.id === itemId ? { ...item, status: newStatus as any } : item) });
   };
 
-  const updateCodingStatus = (type: "icd10" | "cpt", itemId: string, newStatus: string) => {
-    if (!localWorkflowData) return;
-    setLocalWorkflowData({ ...localWorkflowData, coding: { ...localWorkflowData.coding, [type]: localWorkflowData.coding[type].map((item) => item.id === itemId ? { ...item, status: newStatus } : item) } });
-  };
-
   const updateMedicalNecessityStatus = (itemId: string, newStatus: string) => {
     if (!localWorkflowData) return;
     setLocalWorkflowData({ ...localWorkflowData, medicalNecessity: localWorkflowData.medicalNecessity.map((item) => item.id === itemId ? { ...item, status: newStatus as any } : item) });
@@ -278,7 +273,6 @@ export function PreAuthWorkflow({
             <CodingContent
               coding={localWorkflowData.coding}
               onViewDoc={(item) => onOpenDoc("Medical Coding", item)}
-              onStatusChange={updateCodingStatus}
             />
           ) : <EmptyState />}
           <RaiseQuerySection
@@ -368,39 +362,101 @@ function EmptyState() {
 // ─── Stage 2: Medical Coding ──────────────────────────────────────────────────
 
 function CodingContent({
-  coding, onViewDoc, onStatusChange,
+  coding, onViewDoc,
 }: {
   coding: PreAuthWorkflowData["coding"];
   onViewDoc: (item: any) => void;
-  onStatusChange: (type: "icd10" | "cpt", itemId: string, newStatus: string) => void;
 }) {
   const [codingVerdicts, setCodingVerdicts] = useState<Record<string, string>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ code: string; description: string }>({ code: "", description: "" });
+  const [editedItems, setEditedItems] = useState<Record<string, { code: string; description: string }>>({});
+
   const allItems = [...coding.icd10, ...coding.cpt];
   const setVerdict = (id: string, v: string) => setCodingVerdicts((prev) => ({ ...prev, [id]: v }));
 
+  const startEdit = (item: typeof allItems[number]) => {
+    const ov = editedItems[item.id];
+    setEditingId(item.id);
+    setEditDraft({ code: ov?.code ?? item.code, description: ov?.description ?? item.description });
+  };
+  const saveEdit = (id: string) => {
+    if (!editDraft.code.trim() || !editDraft.description.trim()) return;
+    setEditedItems((prev) => ({ ...prev, [id]: { code: editDraft.code.trim(), description: editDraft.description.trim() } }));
+    setEditingId(null);
+  };
+  const cancelEdit = () => setEditingId(null);
+
+  const VERDICT_COLORS = {
+    accept: { color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" },
+    query:  { color: "#92400e", bg: "#fffbeb", border: "#fde68a" },
+    reject: { color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" },
+  };
+
   const renderCodeCard = (item: typeof allItems[number], type: "icd10" | "cpt") => {
-    const verdict = codingVerdicts[item.id] ?? "accept";
-    const vc = { accept: { color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" }, query: { color: "#92400e", bg: "#fffbeb", border: "#fde68a" }, reject: { color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" } }[verdict]!;
+    const verdict = codingVerdicts[item.id] as "accept" | "query" | "reject" | undefined;
+    const isAiExtracted = item.source === "ai";
+    const isEditing = editingId === item.id;
+    const ov = editedItems[item.id];
+    const displayCode = ov?.code ?? item.code;
+    const displayDescription = ov?.description ?? item.description;
+    const wasEdited = !!ov;
 
     return (
       <div key={item.id} style={{ background: "var(--color-white)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
               <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 14, color: "var(--color-text-primary)", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "1px 6px" }}>
-                {item.code}
+                {displayCode}
               </span>
               <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 {type === "icd10" ? "ICD-10 Diagnosis" : "CPT Procedure"}
               </span>
+              {isAiExtracted ? (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#F5F3FF", color: "#6D28D9", border: "1px solid #DDD6FE", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  AI Extracted
+                </span>
+              ) : (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#F0F9FF", color: "#0369A1", border: "1px solid #BAE6FD", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v14a2 2 0 01-2 2z" /></svg>
+                  Hospital Submitted
+                </span>
+              )}
+              {wasEdited && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE" }}>
+                  Edited
+                </span>
+              )}
             </div>
-            <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-primary)", fontWeight: 500, marginBottom: 4 }}>{item.description}</p>
+            <p style={{ fontSize: "var(--font-size-base)", color: "var(--color-text-primary)", fontWeight: 500, marginBottom: 0 }}>{displayDescription}</p>
           </div>
-          <select value={verdict} onChange={(e) => setVerdict(item.id, e.target.value)} style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, padding: "3px 8px", borderRadius: "var(--radius-xs)", border: `1px solid ${vc.border}`, background: vc.bg, color: vc.color, cursor: "pointer", flexShrink: 0 }}>
-            <option value="accept">Accept</option>
-            <option value="query">Query</option>
-            <option value="reject">Reject</option>
-          </select>
+          {/* Explicit decision buttons — no default selection */}
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            {(["accept", "query", "reject"] as const).map((v) => {
+              const isSelected = verdict === v;
+              const vc = VERDICT_COLORS[v];
+              return (
+                <button
+                  key={v}
+                  onClick={() => setVerdict(item.id, v)}
+                  style={{
+                    fontSize: "var(--font-size-xs)", fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: "var(--radius-xs)",
+                    border: isSelected ? `2px solid ${vc.border}` : "1px solid var(--color-border)",
+                    background: isSelected ? vc.bg : "var(--color-white)",
+                    color: isSelected ? vc.color : "var(--color-text-muted)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {v === "accept" ? "Accept" : v === "query" ? "Query" : "Reject"}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {item.diagnosisMatch && (
@@ -415,23 +471,60 @@ function CodingContent({
           </blockquote>
         )}
         {item.suggestion && (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "var(--radius-xs)", marginBottom: 8 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" /></svg>
-            <p style={{ fontSize: "var(--font-size-xs)", color: "#1D4ED8", margin: 0 }}><strong>AI Hint:</strong> {item.suggestion}</p>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 12px", background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: "var(--radius-xs)", marginTop: 8 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#6D28D9", marginBottom: 2 }}>AI Suggestion</p>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "#4C1D95", margin: 0, lineHeight: 1.5 }}>{item.suggestion}</p>
+            </div>
           </div>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-          <select value={item.status} onChange={(e) => onStatusChange(type, item.id, e.target.value)} style={{ fontSize: "var(--font-size-xs)", padding: "2px 8px", borderRadius: 20, border: "none", background: item.status === "valid" ? "#dcfce7" : item.status === "mismatch" ? "#fef2f2" : "#fefce8", color: item.status === "valid" ? "#15803d" : item.status === "mismatch" ? "#b91c1c" : "#92400e", cursor: "pointer", fontWeight: 600 }}>
-            <option value="valid">Valid</option>
-            <option value="mismatch">Mismatch</option>
-            <option value="missing_specificity">Missing Specificity</option>
-          </select>
-          <button onClick={() => onViewDoc(item)} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "3px 8px", cursor: "pointer" }}>
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-            View in Document
-          </button>
-        </div>
+        {/* ── Inline edit form ─────────────────────────────────────────────── */}
+        {isEditing && (
+          <div style={{ borderTop: "1px solid var(--color-border)", marginTop: 12, paddingTop: 12 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 4 }}>Code</p>
+                <input
+                  value={editDraft.code}
+                  onChange={(e) => setEditDraft((prev) => ({ ...prev, code: e.target.value }))}
+                  style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 13, width: 90, padding: "3px 8px", border: "1.5px solid var(--color-accent)", borderRadius: "var(--radius-xs)", outline: "none", color: "var(--color-text-primary)", background: "var(--color-white)" }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 4 }}>Description</p>
+                <input
+                  value={editDraft.description}
+                  onChange={(e) => setEditDraft((prev) => ({ ...prev, description: e.target.value }))}
+                  style={{ width: "100%", fontSize: "var(--font-size-xs)", padding: "3px 8px", border: "1.5px solid var(--color-accent)", borderRadius: "var(--radius-xs)", outline: "none", color: "var(--color-text-primary)", background: "var(--color-white)", boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={cancelEdit} style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-muted)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "4px 12px", cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={() => saveEdit(item.id)} style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "#fff", background: "var(--color-black)", border: "none", borderRadius: "var(--radius-xs)", padding: "4px 12px", cursor: "pointer" }}>
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Bottom actions ───────────────────────────────────────────────── */}
+        {!isEditing && (
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+            <button onClick={() => startEdit(item)} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "3px 8px", cursor: "pointer" }}>
+              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" /></svg>
+              Edit
+            </button>
+            <button onClick={() => onViewDoc(item)} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "3px 8px", cursor: "pointer" }}>
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              View in Document
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -540,8 +633,20 @@ function MedicalNecessityContent({
         ))}
       </div>
 
-      <div style={{ background: "var(--color-white)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: 16 }}>
-        <p style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: 12 }}>TPA Necessity Verdict</p>
+      <div style={{ background: "var(--color-white)", border: `2px solid ${necessityVerdict === null ? "#FED7AA" : necessityVerdict === "confirmed" ? "#BBF7D0" : "#FECACA"}`, borderRadius: "var(--radius-md)", padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <p style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", margin: 0 }}>Necessity Verdict</p>
+          {necessityVerdict === null && (
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>
+              Your decision required
+            </span>
+          )}
+        </div>
+        {necessityVerdict === null && (
+          <p style={{ fontSize: "var(--font-size-xs)", color: "#92400E", marginBottom: 12, lineHeight: 1.5 }}>
+            AI has assessed medical necessity above. Review the score and supporting evidence, then confirm your verdict below.
+          </p>
+        )}
         <div style={{ display: "flex", gap: 10 }}>
           {(["confirmed", "disputed"] as const).map((v) => (
             <button key={v} onClick={() => setNecessityVerdict(v)} style={{ flex: 1, padding: "8px 0", borderRadius: "var(--radius-sm)", border: necessityVerdict === v ? `2px solid ${v === "confirmed" ? "#16A34A" : "#DC2626"}` : "1px solid var(--color-border)", background: necessityVerdict === v ? (v === "confirmed" ? "#F0FDF4" : "#FEF2F2") : "var(--color-white)", color: necessityVerdict === v ? (v === "confirmed" ? "#15803D" : "#B91C1C") : "var(--color-text-secondary)", fontWeight: 600, fontSize: "var(--font-size-base)", cursor: "pointer" }}>
@@ -549,6 +654,11 @@ function MedicalNecessityContent({
             </button>
           ))}
         </div>
+        {necessityVerdict && (
+          <button onClick={() => setNecessityVerdict(null)} style={{ marginTop: 8, fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            Change verdict
+          </button>
+        )}
       </div>
     </div>
   );

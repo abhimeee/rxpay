@@ -129,6 +129,7 @@ export interface CodingItem {
   code: string;
   description: string;
   status: "valid" | "mismatch" | "missing_specificity";
+  source?: "hospital" | "ai";  // Who provided this code
   suggestion?: string;
   clinicalContext?: string;  // Quoted text from source document
   diagnosisMatch?: string;   // Plain-English compatibility note

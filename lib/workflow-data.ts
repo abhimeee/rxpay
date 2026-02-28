@@ -68,6 +68,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
           id: "icd1", type: "icd10", code: "I21.9",
           description: "Acute myocardial infarction, unspecified",
           status: "valid",
+          source: "hospital",
           clinicalContext: "\"Patient presented with acute chest pain radiating to left arm, elevated troponin (2.4× ULN), ST-elevation in V1–V4 on 12-lead ECG.\" — Consultation notes, p.2",
           diagnosisMatch: "Matches procedure — I21.9 is the standard indication for percutaneous coronary intervention",
           suggestion: "Consider I21.01 (STEMI of anterior wall) for greater specificity if LAD involvement confirmed",
@@ -78,6 +79,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
           id: "cpt1", type: "cpt", code: "93454",
           description: "Catheter placement in coronary artery for coronary angiography",
           status: "valid",
+          source: "hospital",
           clinicalContext: "\"Pre-procedure angiography performed to assess coronary anatomy and degree of stenosis before stent placement.\" — Operative note, p.1",
           diagnosisMatch: "Standard diagnostic step prior to stenting in STEMI protocol",
         },
@@ -85,6 +87,7 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
           id: "cpt2", type: "cpt", code: "92928",
           description: "Percutaneous transcatheter placement of intracoronary stent(s), with coronary angioplasty",
           status: "valid",
+          source: "ai",
           clinicalContext: "\"PTCA with drug-eluting stent placed in LAD; 95% stenosis resolved to <10% post-procedure.\" — Procedure report, p.3",
           diagnosisMatch: "Matches diagnosis — standard treatment for acute MI with significant coronary stenosis (I21.9 → 92928)",
         },
@@ -194,10 +197,42 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     coding: {
       icd10: [
-        { id: "icd1", type: "icd10", code: "K80.1", description: "Calculus of gallbladder with acute cholecystitis", status: "valid" },
+        {
+          id: "icd1", type: "icd10", code: "K80.1",
+          description: "Calculus of gallbladder with acute cholecystitis",
+          status: "valid",
+          source: "hospital",
+          diagnosisMatch: "Correct for laparoscopic cholecystectomy — K80.1 captures the gallstone with acute inflammation",
+          suggestion: "Consider K80.00 (without obstruction) or K80.10 (with chronic cholecystitis) for greater specificity — review operative findings to confirm",
+        },
+        {
+          id: "icd2", type: "icd10", code: "K81.0",
+          description: "Acute cholecystitis",
+          status: "valid",
+          source: "ai",
+          clinicalContext: "\"Histopathology: acute and chronic inflammatory infiltrate with areas of necrosis in gallbladder wall — consistent with acute-on-chronic cholecystitis.\" — Pathology report",
+          diagnosisMatch: "AI extracted from pathology report — K81.0 may be coded separately alongside K80.1 when acute inflammation is independently confirmed",
+          suggestion: "Confirm with treating physician whether K81.0 should appear as a secondary diagnosis or if K80.1 alone fully captures the presentation",
+        },
       ],
       cpt: [
-        { id: "cpt1", type: "cpt", code: "47562", description: "Laparoscopy, surgical; cholecystectomy", status: "valid" },
+        {
+          id: "cpt1", type: "cpt", code: "47562",
+          description: "Laparoscopy, surgical; cholecystectomy",
+          status: "valid",
+          source: "hospital",
+          clinicalContext: "\"Laparoscopic cholecystectomy performed without conversion to open; intraoperative cholangiogram not performed.\" — Operative report",
+          diagnosisMatch: "Direct match — 47562 is the standard CPT for laparoscopic cholecystectomy",
+        },
+        {
+          id: "cpt2", type: "cpt", code: "49320",
+          description: "Laparoscopy, abdomen; diagnostic",
+          status: "missing_specificity",
+          source: "ai",
+          clinicalContext: "\"Initial diagnostic laparoscopy performed to assess peritoneal involvement before proceeding to cholecystectomy.\" — Operative note, p.1",
+          diagnosisMatch: "AI extracted from operative note — 49320 may be separately billable if diagnostic laparoscopy preceded the therapeutic procedure",
+          suggestion: "49320 is only separately reimbursable if it was a distinct diagnostic step. If it was part of the same surgical session, 47562 alone is sufficient — verify with billing guidelines",
+        },
       ],
     },
     medicalNecessity: [
@@ -295,10 +330,24 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     coding: {
       icd10: [
-        { id: "icd1", type: "icd10", code: "M17.11", description: "Unilateral primary osteoarthritis, right knee", status: "valid" },
+        {
+          id: "icd1", type: "icd10", code: "M17.11",
+          description: "Unilateral primary osteoarthritis, right knee",
+          status: "valid",
+          source: "ai",
+          clinicalContext: "\"X-ray: Kellgren-Lawrence Grade III, right knee — severe joint space narrowing with subchondral sclerosis. Conservative management failed over 18 months.\" — Orthopaedic consultation, p.3",
+          diagnosisMatch: "AI confirmed — M17.11 specifically codes right-knee unilateral OA, consistent with surgical plan",
+          suggestion: "M17.31 (Secondary osteoarthritis, right knee) may apply if prior knee injury is documented — verify patient history before finalising",
+        },
       ],
       cpt: [
-        { id: "cpt1", type: "cpt", code: "27447", description: "Total knee arthroplasty with prosthesis", status: "valid" },
+        {
+          id: "cpt1", type: "cpt", code: "27447",
+          description: "Total knee arthroplasty with prosthesis",
+          status: "valid",
+          source: "hospital",
+          diagnosisMatch: "Correct procedure code for total knee replacement with implant",
+        },
       ],
     },
     medicalNecessity: [
@@ -399,10 +448,25 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
     ],
     coding: {
       icd10: [
-        { id: "icd1", type: "icd10", code: "H25.1", description: "Senile nuclear cataract", status: "valid" },
+        {
+          id: "icd1", type: "icd10", code: "H25.1",
+          description: "Senile nuclear cataract",
+          status: "valid",
+          source: "ai",
+          clinicalContext: "\"Best corrected visual acuity 6/36 right eye; dense nuclear cataract with posterior subcapsular changes confirmed on slit-lamp.\" — Ophthalmology consultation notes",
+          diagnosisMatch: "AI extracted from slit-lamp findings — H25.1 confirmed by clinical documentation",
+          suggestion: "H25.11 (Age-related nuclear cataract, right eye) adds laterality — update if this is a unilateral procedure",
+        },
       ],
       cpt: [
-        { id: "cpt1", type: "cpt", code: "66984", description: "Extracapsular cataract removal with IOL", status: "valid" },
+        {
+          id: "cpt1", type: "cpt", code: "66984",
+          description: "Extracapsular cataract removal with IOL",
+          status: "valid",
+          source: "ai",
+          clinicalContext: "\"Phacoemulsification with foldable intraocular lens implantation planned — day-care basis, no general anaesthesia required.\" — Procedure plan",
+          diagnosisMatch: "AI confirmed — 66984 matches phacoemulsification with IOL as documented in procedure plan",
+        },
       ],
     },
     medicalNecessity: [
@@ -890,8 +954,25 @@ const workflowByPreAuthId: Record<string, PreAuthWorkflowData> = {
       { id: "e5", label: "Waiting period", status: "warning", value: "Unknown", detail: "Waiting period not verified." },
     ],
     coding: {
-      icd10: [{ id: "icd1", type: "icd10", code: "K62.5", description: "Hemorrhage of anus and rectum", status: "missing_specificity" }],
-      cpt: [{ id: "cpt1", type: "cpt", code: "45380", description: "Colonoscopy with biopsy", status: "missing_specificity" }],
+      icd10: [
+        {
+          id: "icd1", type: "icd10", code: "K62.5",
+          description: "Hemorrhage of anus and rectum",
+          status: "missing_specificity",
+          source: "hospital",
+          suggestion: "K57.31 (Diverticulosis of large intestine with bleeding) or K92.1 (Melena) may better characterise the bleeding source — specify anatomic location and aetiology after colonoscopy findings are available",
+        },
+      ],
+      cpt: [
+        {
+          id: "cpt1", type: "cpt", code: "45380",
+          description: "Colonoscopy with biopsy",
+          status: "missing_specificity",
+          source: "ai",
+          clinicalContext: "\"Patient referred for diagnostic colonoscopy; multiple biopsies to be taken from sigmoid colon.\" — AI extracted from referral letter",
+          suggestion: "45385 (colonoscopy with removal of tumour/polyp) may apply if polypectomy was performed — confirm procedure details with the operating physician",
+        },
+      ],
     },
     medicalNecessity: [
       { id: "mn1", level: 1, source: "IRDAI Guidelines", finding: "Diagnostic colonoscopy covered with clinical notes.", status: "conditional" },

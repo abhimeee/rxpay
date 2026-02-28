@@ -219,6 +219,7 @@ export function AnalysisFlow({
   }, [allItems, docFilter]);
 
   const [docStates, setDocStates] = useState<Map<string, DocState>>(() => initDocStates(checklist, analysisResult));
+  const [eligibilityDecision, setEligibilityDecision] = useState<"approved" | "flagged" | null>(null);
 
   // ─── State helpers ──────────────────────────────────────────────────────────
 
@@ -523,16 +524,34 @@ export function AnalysisFlow({
 
       {/* Eligibility table — only on Policy & ID tab */}
       {docFilter === "policy_id" && eligibilityItems.length > 0 && (
-        <div style={{ background: "var(--color-white)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)" }}>
+        <div style={{ background: "var(--color-white)", border: `2px solid ${eligibilityDecision === null ? "#FED7AA" : eligibilityDecision === "approved" ? "#BBF7D0" : "#FECACA"}`, borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 10 }}>
             <p style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", margin: 0 }}>
               Eligibility Checks
             </p>
+            {eligibilityDecision === null && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>
+                Your approval required
+              </span>
+            )}
+            {eligibilityDecision === "approved" && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0" }}>
+                ✓ Eligibility Confirmed
+              </span>
+            )}
+            {eligibilityDecision === "flagged" && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FECACA" }}>
+                ⚠ Issues Flagged
+              </span>
+            )}
           </div>
+
+          {/* AI-assessed checks — read-only */}
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "var(--color-bg)" }}>
-                {["Check", "Value", "Detail", "Verdict"].map((h) => (
+                {["Check", "Value", "Detail", "AI Assessment"].map((h) => (
                   <th key={h} style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", padding: "8px 12px", textAlign: "left", borderBottom: "1px solid var(--color-border)" }}>{h}</th>
                 ))}
               </tr>
@@ -544,20 +563,51 @@ export function AnalysisFlow({
                   <td style={{ padding: "10px 12px", fontSize: "var(--font-size-base)", color: "var(--color-text-secondary)" }}>{item.value}</td>
                   <td style={{ padding: "10px 12px", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{item.detail ?? "—"}</td>
                   <td style={{ padding: "10px 12px" }}>
-                    <select
-                      value={item.status}
-                      onChange={(e) => onEligibilityStatusChange(item.id, e.target.value)}
-                      style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, padding: "2px 8px", borderRadius: 20, border: "none", background: item.status === "pass" ? "#dcfce7" : item.status === "fail" ? "#fef2f2" : "#fefce8", color: item.status === "pass" ? "#15803d" : item.status === "fail" ? "#b91c1c" : "#92400e", cursor: "pointer" }}
-                    >
-                      <option value="pass">Pass</option>
-                      <option value="warning">Review</option>
-                      <option value="fail">Fail</option>
-                    </select>
+                    <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: item.status === "pass" ? "#dcfce7" : item.status === "fail" ? "#fef2f2" : "#fefce8", color: item.status === "pass" ? "#15803d" : item.status === "fail" ? "#b91c1c" : "#92400e" }}>
+                      {item.status === "pass" ? "Pass" : item.status === "fail" ? "Fail" : "Review"}
+                    </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* Single overall approval panel */}
+          <div style={{ padding: "12px 16px", borderTop: "2px solid var(--color-border)", background: "var(--color-bg)" }}>
+            {eligibilityDecision === null ? (
+              <>
+                <p style={{ fontSize: "var(--font-size-xs)", color: "#92400E", marginBottom: 10 }}>
+                  Review all eligibility checks above — AI has assessed each item. Confirm or flag issues with a single decision.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => setEligibilityDecision("approved")}
+                    style={{ flex: 1, padding: "8px 0", borderRadius: "var(--radius-sm)", border: "1px solid #BBF7D0", background: "#F0FDF4", color: "#15803D", fontWeight: 700, fontSize: "var(--font-size-base)", cursor: "pointer" }}
+                  >
+                    ✓ Confirm Eligibility
+                  </button>
+                  <button
+                    onClick={() => setEligibilityDecision("flagged")}
+                    style={{ padding: "8px 16px", borderRadius: "var(--radius-sm)", border: "1px solid #FECACA", background: "#FEF2F2", color: "#B91C1C", fontWeight: 700, fontSize: "var(--font-size-base)", cursor: "pointer" }}
+                  >
+                    ⚠ Flag Issues
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: eligibilityDecision === "approved" ? "#15803D" : "#B91C1C" }}>
+                  {eligibilityDecision === "approved" ? "✓ You confirmed eligibility for all checks." : "⚠ You flagged issues with eligibility — raise a query to hospital."}
+                </span>
+                <button
+                  onClick={() => setEligibilityDecision(null)}
+                  style={{ marginLeft: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", background: "none", border: "1px solid var(--color-border)", borderRadius: "var(--radius-xs)", padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  Change
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
