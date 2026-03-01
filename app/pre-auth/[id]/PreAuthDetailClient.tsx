@@ -16,6 +16,7 @@ import { PreAuthStatusBadge } from "../../components/StatusBadge";
 import { PreAuthWorkflow } from "./PreAuthWorkflow";
 import { getDocumentLinesForItem } from "@/lib/document-helper";
 import { PdfLine } from "@/lib/pdf-generator";
+import { PdfHighlightViewer, PdfHighlightRect } from "../../components/PdfHighlightViewer";
 
 interface PreAuthDetailClientProps {
     pa: PreAuthRequest;
@@ -36,7 +37,9 @@ interface DocOverlayState {
     docId?: string;
     aiSuggestion?: string;
     docType?: string;
-    pdfUrl?: string; // When set, shows actual PDF on left instead of text rendering
+    pdfUrl?: string;             // When set, shows actual PDF on left instead of text rendering
+    pdfHighlights?: PdfHighlightRect[]; // Yellow highlight boxes on the PDF
+    pdfTargetPage?: number;      // 1-indexed page to scroll to
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -243,11 +246,11 @@ function DocumentViewerOverlay({
                                     <span style={{ color: "var(--color-text-muted)", fontSize: 10 }}>(see extracted fields →)</span>
                                 </div>
                             </div>
-                            {/* Actual PDF iframe */}
-                            <iframe
-                                src={overlay.pdfUrl}
-                                style={{ flex: 1, width: "100%", border: "none" }}
-                                title={overlay.title}
+                            {/* PDF rendered with canvas + highlight boxes */}
+                            <PdfHighlightViewer
+                                pdfUrl={overlay.pdfUrl!}
+                                highlights={overlay.pdfHighlights}
+                                targetPage={overlay.pdfTargetPage ?? 1}
                             />
                         </div>
                     ) : (
@@ -809,6 +812,144 @@ function TabStatusDot({ status }: { status: SectionStatus }) {
     return null;
 }
 
+// ─── Casefile PDF highlight map (PA022 — Ramesh Kumar, 3-page scanned form) ──
+//
+// Coordinates are fractions (0–1) of page width/height.
+// Estimated from standard Indian hospital cashless form layouts.
+//
+// Page 1: Cashless Pre-Auth Request Form (Star Health)
+//   — TPA header, patient name, policy number, Aadhaar, consent/signature
+// Page 2: Doctor's Letter & Clinical Examination Notes
+//   — Diagnosis, ICD codes, clinical findings, procedure recommendation
+// Page 3: Estimated Cost Breakdown
+//   — Room, OT, medicines, investigations, total
+
+function getCasefileHighlights(type: string, label: string): {
+    page: number;
+    highlights: PdfHighlightRect[];
+} {
+    // ── Page 1 items ──────────────────────────────────────────────────────────
+    if (/cashless|pre-?auth.*form|form a/i.test(label)) {
+        return {
+            page: 1,
+            highlights: [
+                { page: 1, x: 0.03, y: 0.05, w: 0.94, h: 0.12, label: "Cashless pre-auth request form header" },
+                { page: 1, x: 0.03, y: 0.18, w: 0.6,  h: 0.06, label: "TPA / hospital details" },
+            ],
+        };
+    }
+    if (/policy|e-?card|policynum/i.test(label)) {
+        return {
+            page: 1,
+            highlights: [
+                { page: 1, x: 0.03, y: 0.30, w: 0.55, h: 0.06, label: "Policy / card number" },
+                { page: 1, x: 0.03, y: 0.37, w: 0.45, h: 0.05, label: "Sum insured" },
+            ],
+        };
+    }
+    if (/aadhaar|id proof/i.test(label)) {
+        return {
+            page: 1,
+            highlights: [
+                { page: 1, x: 0.03, y: 0.43, w: 0.52, h: 0.06, label: "Aadhaar / ID proof" },
+            ],
+        };
+    }
+    if (/consent/i.test(label)) {
+        return {
+            page: 1,
+            highlights: [
+                { page: 1, x: 0.03, y: 0.80, w: 0.94, h: 0.12, label: "Patient consent & signature" },
+            ],
+        };
+    }
+
+    // ── Page 2 items ──────────────────────────────────────────────────────────
+    if (/doctor|recommendation/i.test(label)) {
+        return {
+            page: 2,
+            highlights: [
+                { page: 2, x: 0.03, y: 0.06, w: 0.94, h: 0.16, label: "Doctor's letterhead & recommendation" },
+                { page: 2, x: 0.03, y: 0.72, w: 0.55, h: 0.10, label: "Doctor signature & stamp" },
+            ],
+        };
+    }
+    if (/clinical|examination/i.test(label)) {
+        return {
+            page: 2,
+            highlights: [
+                { page: 2, x: 0.03, y: 0.28, w: 0.94, h: 0.28, label: "Clinical examination findings" },
+            ],
+        };
+    }
+    if (/diagnosis|icd|medical.cod|nephr/i.test(label) || type === "Medical Coding") {
+        return {
+            page: 2,
+            highlights: [
+                { page: 2, x: 0.03, y: 0.24, w: 0.94, h: 0.10, label: "Diagnosis" },
+                { page: 2, x: 0.03, y: 0.36, w: 0.70, h: 0.08, label: "ICD codes" },
+            ],
+        };
+    }
+    if (type === "Medical Necessity") {
+        return {
+            page: 2,
+            highlights: [
+                { page: 2, x: 0.03, y: 0.24, w: 0.94, h: 0.10, label: "Diagnosis / necessity" },
+                { page: 2, x: 0.03, y: 0.46, w: 0.94, h: 0.16, label: "Procedure justification" },
+            ],
+        };
+    }
+
+    // ── Page 3 items ──────────────────────────────────────────────────────────
+    if (/cost|breakdown|itemis/i.test(label)) {
+        return {
+            page: 3,
+            highlights: [
+                { page: 3, x: 0.03, y: 0.05, w: 0.94, h: 0.08, label: "Cost breakdown header" },
+                { page: 3, x: 0.03, y: 0.18, w: 0.94, h: 0.60, label: "Itemised cost table" },
+            ],
+        };
+    }
+    if (/room|bed/i.test(label)) {
+        return {
+            page: 3,
+            highlights: [{ page: 3, x: 0.03, y: 0.26, w: 0.88, h: 0.08, label: "Room / bed charges" }],
+        };
+    }
+    if (/medicine|pharma/i.test(label)) {
+        return {
+            page: 3,
+            highlights: [{ page: 3, x: 0.03, y: 0.46, w: 0.88, h: 0.08, label: "Medicine / pharmacy charges" }],
+        };
+    }
+    if (/investigation|lab/i.test(label)) {
+        return {
+            page: 3,
+            highlights: [{ page: 3, x: 0.03, y: 0.56, w: 0.88, h: 0.08, label: "Investigation / lab charges" }],
+        };
+    }
+
+    // ── Fraud & Anomaly → show page 1 (provider / patient info) ──────────────
+    if (type === "Fraud & Anomaly" || /fraud|anomaly/i.test(type)) {
+        return {
+            page: 1,
+            highlights: [
+                { page: 1, x: 0.03, y: 0.05, w: 0.94, h: 0.16, label: "Provider / hospital details" },
+                { page: 1, x: 0.03, y: 0.22, w: 0.60, h: 0.08, label: "Patient information" },
+            ],
+        };
+    }
+
+    // ── Default fallback: first page, no specific highlight ───────────────────
+    return {
+        page: 1,
+        highlights: [
+            { page: 1, x: 0.03, y: 0.05, w: 0.94, h: 0.08, label: "Document header" },
+        ],
+    };
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function PreAuthDetailClient({
@@ -850,24 +991,17 @@ export function PreAuthDetailClient({
             ...context,
         });
 
-        // For the Ramesh Kumar demo case (PA022), show the actual casefile PDF on the left.
-        // Map document type / item label to the most relevant page.
+        // For the Ramesh Kumar demo case (PA022), show the actual casefile PDF with yellow highlights.
         let pdfUrl: string | undefined;
+        let pdfHighlights: PdfHighlightRect[] | undefined;
+        let pdfTargetPage: number | undefined;
+
         if (pa.id === "PA022") {
+            pdfUrl = "/casefile.pdf";
             const label = (item?.label ?? "").toLowerCase();
-            if (/aadhaar|id proof|policy|e-card|cashless|tpa|consent/.test(label)) {
-                pdfUrl = "/casefile.pdf#page=1";
-            } else if (/doctor|clinical|diagnosis|examination|recommendation|nephrology/.test(label)) {
-                pdfUrl = "/casefile.pdf#page=2";
-            } else if (/cost|breakdown|investigation|medicine|room|admission/.test(label)) {
-                pdfUrl = "/casefile.pdf#page=3";
-            } else if (type === "Medical Coding" || type === "Medical Necessity") {
-                pdfUrl = "/casefile.pdf#page=2";
-            } else if (type === "Fraud & Anomaly") {
-                pdfUrl = "/casefile.pdf#page=1";
-            } else {
-                pdfUrl = "/casefile.pdf";
-            }
+            const result = getCasefileHighlights(type, label);
+            pdfHighlights = result.highlights;
+            pdfTargetPage = result.page;
         }
 
         setDocOverlay({
@@ -878,6 +1012,8 @@ export function PreAuthDetailClient({
             aiSuggestion: item?.aiSuggestion,
             docType: type,
             pdfUrl,
+            pdfHighlights,
+            pdfTargetPage,
         });
     }, [holder, insurer, hospital, pa]);
 
